@@ -21,6 +21,7 @@ import Sell from "./pages/Sell";
 import SellStart from "./pages/SellStart";
 import SellerOrders from "./pages/SellerOrders";
 import SellerOverview from "./pages/SellerOverview";
+import SellerDisputes from "./pages/SellerDisputes";
 import MyOrders from "./pages/orders/MyOrders";
 import OrderDetail from "./pages/orders/OrderDetail";
 import CreateDispute from "./pages/dispute/CreateDispute";
@@ -54,11 +55,12 @@ function App() {
             element={<SellerEditListing />}
           />
           <Route path="/seller/orders" element={<SellerOrders />} />
+          <Route path="/seller/disputes" element={<SellerDisputes />} />
           <Route path="/seller/:id" element={<SellerProfile />} />
-          <Route path="*" element={<NotFound />} />
           <Route path="/disputes/create/:orderId" element={<CreateDispute />} />
           <Route path="/disputes/my" element={<DisputeList />} />
           <Route path="/disputes/:id" element={<DisputeDetail />} />
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

@@ -4,7 +4,7 @@ const disputeSchema = new mongoose.Schema(
   {
     orderId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Order", // Trỏ tới collection Order
+      ref: "Order", // Points to the Order collection
       required: true,
     },
     buyerId: {
@@ -17,8 +17,8 @@ const disputeSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
-    
-    // Phân loại lý do để Admin dễ thống kê
+
+    // Reason category, so admins can report on dispute drivers
     reason: {
       type: String,
       enum: [
@@ -30,85 +30,97 @@ const disputeSchema = new mongoose.Schema(
         "MISSING_PARTS",
         "LATE_DELIVERY",
         "REFUND_NOT_RECEIVED",
-        "OTHER"
+        "OTHER",
       ],
       required: true,
     },
-    
+
     description: {
       type: String,
       required: true,
     },
-    
-    // Mảng chứa các URL ảnh minh chứng
+
+    // URLs of the photos the buyer attached as proof
     evidenceImages: [
       {
-        type: String, 
-      }
+        type: String,
+      },
     ],
-    
-    // Trạng thái chi tiết của luồng giải quyết
+
+    // Latest message the seller sent back to the buyer
+    sellerResponse: {
+      type: String,
+      default: "",
+    },
+
+    // Detailed state of the resolution flow
     status: {
       type: String,
       enum: [
-        "OPEN",              // Mới tạo, chờ seller phản hồi
-        "SELLER_RESPONDED",  // Seller đã trả lời
-        "ESCALATED",         // Buyer không hài lòng -> đẩy lên admin
-        "UNDER_REVIEW",      // Admin đang xử lý
-        "RESOLVED_REFUND",   // Giải quyết: hoàn tiền
-        "RESOLVED_REPLACE",  // Giải quyết: đổi hàng
-        "RESOLVED_REJECTED", // Từ chối khiếu nại
-        "CLOSED"             // Đóng (buyer tự đóng hoặc timeout)
+        "OPEN", // Just created, waiting for the seller to respond
+        "SELLER_RESPONDED", // Seller has replied
+        "ESCALATED", // Buyer was not satisfied -> escalated to eBay
+        "UNDER_REVIEW", // Admin is reviewing the case
+        "RESOLVED_REFUND", // Closed with a refund
+        "RESOLVED_REPLACE", // Closed with a replacement
+        "RESOLVED_REJECTED", // Dispute was rejected
+        "CLOSED", // Closed (buyer withdrew it, or it timed out)
       ],
       default: "OPEN",
     },
-    
-    // Kết quả giải quyết cuối cùng
+
+    // Final outcome of the case
     resolution: {
       type: {
         type: String,
-        enum: ["REFUND_FULL", "REFUND_PARTIAL", "REPLACEMENT", "REJECTED", "NONE"],
-        default: "NONE"
+        enum: [
+          "REFUND_FULL",
+          "REFUND_PARTIAL",
+          "REPLACEMENT",
+          "REJECTED",
+          "NONE",
+        ],
+        default: "NONE",
       },
-      amount: Number, // Dùng nếu hoàn tiền 1 phần
+      amount: Number, // Used for partial refunds
       note: String,
       resolvedBy: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "User" // Trỏ tới Admin hoặc Seller đã giải quyết
+        ref: "User", // The admin or seller who closed the case
       },
-      resolvedAt: Date
+      resolvedAt: Date,
     },
-    
-    // Lịch sử xử lý để vẽ Stepper trên giao diện
+
+    // Activity history, rendered as a stepper in the UI
     timeline: [
       {
         actor: {
           type: String,
           enum: ["buyer", "seller", "admin", "system"],
-          required: true
+          required: true,
         },
         action: {
           type: String,
-          required: true // VD: "created", "seller_replied", "escalated"...
+          required: true, // e.g. "created", "seller_replied", "escalated"
         },
         note: String,
         timestamp: {
           type: Date,
-          default: Date.now
-        }
-      }
+          default: Date.now,
+        },
+      },
     ],
-    
-    // Độ ưu tiên của khiếu nại
+
+    // How urgent the case is
     priority: {
       type: String,
       enum: ["LOW", "MEDIUM", "HIGH"],
-      default: "LOW"
-    }
+      default: "LOW",
+    },
   },
-  { 
-    timestamps: true 
-  }
+  {
+    timestamps: true,
+  },
 );
 
 module.exports = mongoose.model("Dispute", disputeSchema);
