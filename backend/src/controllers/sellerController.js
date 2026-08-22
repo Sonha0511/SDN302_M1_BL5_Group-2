@@ -71,7 +71,30 @@ exports.updateSellerProfile = async (req, res) => {
       return res.status(404).json({ success: false, message: "Seller not found" });
     }
 
-    const nextUsername = username?.trim();
+    const values = { name, username, storeName, bio, phone, location, shippingFrom };
+    const limits = { name: 60, username: 30, storeName: 60, bio: 500, phone: 20, location: 80, shippingFrom: 80 };
+    const normalized = Object.fromEntries(Object.entries(values).map(([key, value]) => [key, typeof value === "string" ? value.trim() : ""]));
+    const invalidLength = Object.entries(limits).find(([key, limit]) => normalized[key].length > limit);
+    if (invalidLength) {
+      return res.status(400).json({ success: false, message: `${invalidLength[0]} must be ${invalidLength[1]} characters or fewer` });
+    }
+    if (!normalized.name || !normalized.storeName) {
+      return res.status(400).json({ success: false, message: "Name and store name are required" });
+    }
+    if (!/^[a-zA-Z0-9._-]{3,30}$/.test(normalized.username)) {
+      return res.status(400).json({ success: false, message: "Username must be 3-30 letters, numbers, dots, underscores or hyphens" });
+    }
+    if (normalized.phone && !/^\+?[0-9 ()-]{8,20}$/.test(normalized.phone)) {
+      return res.status(400).json({ success: false, message: "Please provide a valid phone number" });
+    }
+    const allowedBusinessTypes = ["Individual", "Business", "Authorized reseller"];
+    const allowedResponseTimes = ["Within 24 hours", "Within 2 business days", "Within 3 business days"];
+    const allowedReturnPolicies = ["30-day returns", "14-day returns", "No returns"];
+    if (!allowedBusinessTypes.includes(businessType) || !allowedResponseTimes.includes(responseTime) || !allowedReturnPolicies.includes(returnPolicy)) {
+      return res.status(400).json({ success: false, message: "Please choose valid store policy options" });
+    }
+
+    const nextUsername = normalized.username;
     if (nextUsername && nextUsername !== seller.username) {
       const existingUser = await User.findOne({
         username: nextUsername,
@@ -83,7 +106,7 @@ exports.updateSellerProfile = async (req, res) => {
       seller.username = nextUsername;
     }
 
-    if (name?.trim()) seller.name = name.trim();
+    seller.name = normalized.name;
     if (req.file?.path) {
       seller.avatar = req.file.path;
     } else if (typeof avatar === "string") {
@@ -92,18 +115,14 @@ exports.updateSellerProfile = async (req, res) => {
 
     seller.sellerProfile = {
       ...seller.sellerProfile,
-      storeName: storeName?.trim() || seller.sellerProfile?.storeName || "",
-      bio: bio?.trim() || seller.sellerProfile?.bio || "",
-      phone: phone?.trim() || seller.sellerProfile?.phone || "",
-      location: location?.trim() || seller.sellerProfile?.location || "",
-      businessType:
-        businessType?.trim() || seller.sellerProfile?.businessType || "Individual",
-      responseTime:
-        responseTime?.trim() || seller.sellerProfile?.responseTime || "Within 24 hours",
-      returnPolicy:
-        returnPolicy?.trim() || seller.sellerProfile?.returnPolicy || "30-day returns",
-      shippingFrom:
-        shippingFrom?.trim() || seller.sellerProfile?.shippingFrom || "",
+      storeName: normalized.storeName,
+      bio: normalized.bio,
+      phone: normalized.phone,
+      location: normalized.location,
+      businessType,
+      responseTime,
+      returnPolicy,
+      shippingFrom: normalized.shippingFrom,
     };
 
     await seller.save();

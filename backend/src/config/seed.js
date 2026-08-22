@@ -1,4 +1,6 @@
 require("dotenv").config({ path: ".env" });
+const path = require("path");
+require("dotenv").config({ path: path.resolve(__dirname, "../../.env") });
 
 const mongoose = require("mongoose");
 const Listing = require("../models/Listing");
@@ -250,9 +252,11 @@ const seed = async () => {
     );
 
     const reviewedOrders = await Order.insertMany(
-      insertedListings.slice(0, 6).map((listing) =>
-        buildOrderData({ buyer, seller, listing, isReviewed: true }),
-      ),
+      insertedListings
+        .slice(0, 6)
+        .map((listing) =>
+          buildOrderData({ buyer, seller, listing, isReviewed: true }),
+        ),
     );
 
     const reviewsToInsert = reviewedOrders.map((order, index) => ({
@@ -261,7 +265,14 @@ const seed = async () => {
       buyerId: buyer._id,
       sellerId: seller._id,
       rating: [5, 4, 5, 4, 5, 5][index],
-      feedbackType: ["positive", "positive", "positive", "neutral", "positive", "positive"][index],
+      feedbackType: [
+        "positive",
+        "positive",
+        "positive",
+        "neutral",
+        "positive",
+        "positive",
+      ][index],
       detailedRatings: reviewDetails[index],
       comment: reviewComments[index],
       images: [],
@@ -286,14 +297,18 @@ const seed = async () => {
     }
 
     const feedbackOrders = await Order.insertMany(
-      insertedListings.slice(6).map((listing) =>
-        buildOrderData({ buyer, seller, listing, isReviewed: false }),
-      ),
+      insertedListings
+        .slice(6)
+        .map((listing) =>
+          buildOrderData({ buyer, seller, listing, isReviewed: false }),
+        ),
     );
 
     console.log(`Inserted ${insertedListings.length} listings`);
     console.log(`Inserted ${reviewsToInsert.length} sample reviews`);
-    console.log(`Inserted ${feedbackOrders.length} delivered orders awaiting feedback`);
+    console.log(
+      `Inserted ${feedbackOrders.length} delivered orders awaiting feedback`,
+    );
     console.log("Demo accounts:");
     console.log("  buyer.demo@ebay.local / 123456");
     console.log("  seller.demo@ebay.local / 123456");
