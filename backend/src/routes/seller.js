@@ -7,7 +7,17 @@ const authMiddleware = require("../middleware/auth.js");
 router.get("/:id/profile", sellerController.getSellerProfile);
 
 router.use(authMiddleware);
-router.patch("/profile", upload.single("avatar"), sellerController.updateSellerProfile);
+router.patch("/profile", (req, res, next) => {
+  upload.single("avatar")(req, res, (err) => {
+    if (err) {
+      return res.status(400).json({
+        success: false,
+        message: err.message || "Unable to upload avatar",
+      });
+    }
+    next();
+  });
+}, sellerController.updateSellerProfile);
 
 // 1. API Lấy danh sách sản phẩm
 router.get("/listings", sellerController.getSellerListings);
