@@ -13,4 +13,5 @@ export const deleteListing = (id) => API.delete(`/seller/listings/${id}`);
 export const getMyOrders = () => API.get("/seller/orders");
 export const updateOrderStatus = (id, status) =>
   API.patch(`/seller/orders/${id}/status`, { status });
+export const confirmOrder = (id) => API.patch(`/seller/orders/${id}/confirm`);
 export const toggleListing = (id) => API.patch(`/seller/listings/${id}/toggle`);

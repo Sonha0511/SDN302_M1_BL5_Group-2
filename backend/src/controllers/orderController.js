@@ -107,6 +107,7 @@ exports.getOrder = async (req, res) => {
 exports.updateOrderStatus = async (req, res) => {
   try {
     const { status } = req.body;
+    const nextStatus = status === "delivery_failed" ? "cancelled" : status;
     const order = await Order.findById(req.params.id);
 
     if (!order) return res.status(404).json({ message: "Order không tồn tại" });
@@ -114,10 +115,61 @@ exports.updateOrderStatus = async (req, res) => {
       return res.status(403).json({ message: "Không có quyền" });
     }
 
-    order.status = status;
-    if (status === "delivered") order.paymentStatus = "paid";
+    if (!order.sellerConfirmed) {
+      return res
+        .status(400)
+        .json({ message: "Seller phải xác nhận đơn hàng trước" });
+    }
+    if (
+      ["delivered", "delivery_failed", "cancelled", "returned"].includes(
+        order.status,
+      )
+    ) {
+      return res
+        .status(400)
+        .json({
+          message: "Đơn hàng đã kết thúc, không thể đổi lại trạng thái",
+        });
+    }
+    const allowedTransitions = {
+      awaiting_shipment: ["shipped", "cancelled"],
+      shipped: ["delivered", "cancelled"],
+      awaiting_payment: ["awaiting_shipment", "cancelled"],
+      pending: ["awaiting_payment", "awaiting_shipment", "cancelled"],
+    };
+    if (!allowedTransitions[order.status]?.includes(nextStatus)) {
+      return res.status(400).json({ message: "Trạng thái mới không hợp lệ" });
+    }
+
+    order.status = nextStatus;
+    if (nextStatus === "delivered") order.paymentStatus = "paid";
     await order.save();
 
+    res.json(order);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// PATCH /api/orders/:id/confirm - seller xác nhận đơn
+exports.confirmOrder = async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id);
+    if (!order) return res.status(404).json({ message: "Order không tồn tại" });
+    if (order.sellerId.toString() !== req.userId)
+      return res.status(403).json({ message: "Không có quyền" });
+    if (order.sellerConfirmed)
+      return res.status(400).json({ message: "Đơn hàng đã được xác nhận" });
+    if (
+      ["delivered", "delivery_failed", "cancelled", "returned"].includes(
+        order.status,
+      )
+    )
+      return res.status(400).json({ message: "Đơn hàng đã kết thúc" });
+
+    order.sellerConfirmed = true;
+    order.sellerConfirmedAt = new Date();
+    await order.save();
     res.json(order);
   } catch (error) {
     res.status(500).json({ message: error.message });

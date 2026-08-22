@@ -20,6 +20,7 @@ import SellerProfile from "./pages/SellerProfile";
 import Sell from "./pages/Sell";
 import SellStart from "./pages/SellStart";
 import SellerOrders from "./pages/SellerOrders";
+import SellerOverview from "./pages/SellerOverview";
 import MyOrders from "./pages/orders/MyOrders";
 import OrderDetail from "./pages/orders/OrderDetail";
 import CreateDispute from "./pages/dispute/CreateDispute";
@@ -46,15 +47,18 @@ function App() {
           <Route path="/sell" element={<Sell />} />
           <Route path="/sell/start" element={<SellStart />} />
           <Route path="/seller/listings" element={<SellerListings />} />
+          <Route path="/seller/overview" element={<SellerOverview />} />
           <Route path="/seller/inventory" element={<SellerInventory />} />
-          <Route path="/seller/listings/:id/edit" element={<SellerEditListing />} />
+          <Route
+            path="/seller/listings/:id/edit"
+            element={<SellerEditListing />}
+          />
           <Route path="/seller/orders" element={<SellerOrders />} />
           <Route path="/seller/:id" element={<SellerProfile />} />
           <Route path="*" element={<NotFound />} />
           <Route path="/disputes/create/:orderId" element={<CreateDispute />} />
           <Route path="/disputes/my" element={<DisputeList />} />
           <Route path="/disputes/:id" element={<DisputeDetail />} />
-
         </Routes>
       </BrowserRouter>
     </AuthProvider>
