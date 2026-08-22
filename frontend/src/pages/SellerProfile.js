@@ -6,6 +6,12 @@ import StarRating from "../components/StarRating";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
 
+const MAX_LENGTHS = { name: 60, username: 30, storeName: 60, bio: 500, phone: 20, location: 80, shippingFrom: 80 };
+const initialForm = {
+  name: "", username: "", storeName: "", bio: "", phone: "", location: "",
+  businessType: "Individual", responseTime: "Within 24 hours", returnPolicy: "30-day returns", shippingFrom: "",
+};
+
 const formatPrice = (price) =>
   new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(
     price || 0,
@@ -29,6 +35,12 @@ function StatCard({ label, value, helper }) {
   );
 }
 
+function FieldError({ message }) {
+  return message ? <p className="mt-1 text-xs font-normal text-red-600" role="alert">{message}</p> : null;
+}
+
+const fieldClass = (hasError) => `mt-1 w-full rounded-lg border bg-white px-3 py-2 text-sm outline-none transition focus:ring-1 ${hasError ? "border-red-500 focus:border-red-500 focus:ring-red-500" : "border-gray-300 focus:border-blue-500 focus:ring-blue-500"}`;
+
 function SellerProfile() {
   const { id } = useParams();
   const { user } = useAuth();
@@ -50,28 +62,32 @@ function SellerProfile() {
     shippingFrom: "",
   });
   const [avatarFile, setAvatarFile] = useState(null);
+  const [avatarPreview, setAvatarPreview] = useState("");
+  const [fieldErrors, setFieldErrors] = useState({});
+
+  const setProfileForm = (sellerData) => {
+    const sellerProfile = sellerData.sellerProfile || {};
+    setFormData({
+      ...initialForm,
+      name: sellerData.name || "", username: sellerData.username || "",
+      storeName: sellerProfile.storeName || "", bio: sellerProfile.bio || "",
+      phone: sellerProfile.phone || "", location: sellerProfile.location || "",
+      businessType: sellerProfile.businessType || "Individual",
+      responseTime: sellerProfile.responseTime || "Within 24 hours",
+      returnPolicy: sellerProfile.returnPolicy || "30-day returns",
+      shippingFrom: sellerProfile.shippingFrom || "",
+    });
+    setAvatarFile(null);
+    setAvatarPreview(sellerData.avatar || "");
+    setFieldErrors({});
+  };
 
   const loadProfile = () =>
     api
       .get(`/seller/${id}/profile`)
       .then((res) => {
         setProfile(res.data.data);
-        setFormData({
-          name: res.data.data.seller.name || "",
-          username: res.data.data.seller.username || "",
-          storeName: res.data.data.seller.sellerProfile?.storeName || "",
-          bio: res.data.data.seller.sellerProfile?.bio || "",
-          phone: res.data.data.seller.sellerProfile?.phone || "",
-          location: res.data.data.seller.sellerProfile?.location || "",
-          businessType:
-            res.data.data.seller.sellerProfile?.businessType || "Individual",
-          responseTime:
-            res.data.data.seller.sellerProfile?.responseTime || "Within 24 hours",
-          returnPolicy:
-            res.data.data.seller.sellerProfile?.returnPolicy || "30-day returns",
-          shippingFrom: res.data.data.seller.sellerProfile?.shippingFrom || "",
-        });
-        setAvatarFile(null);
+        setProfileForm(res.data.data.seller);
       })
       .catch((err) => console.error("Error loading seller profile:", err))
       .finally(() => setLoading(false));
@@ -84,15 +100,43 @@ function SellerProfile() {
 
   const handleChange = (e) => {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+    setFieldErrors((prev) => ({ ...prev, [e.target.name]: "" }));
+  };
+
+  const validateForm = () => {
+    const errors = {};
+    const trimmed = Object.fromEntries(Object.entries(formData).map(([key, value]) => [key, value.trim()]));
+    if (!trimmed.name) errors.name = "Your name is required.";
+    if (!/^[a-zA-Z0-9._-]{3,30}$/.test(trimmed.username)) errors.username = "Use 3-30 letters, numbers, dots, underscores or hyphens.";
+    if (!trimmed.storeName) errors.storeName = "Add a store name so buyers can recognize you.";
+    if (trimmed.phone && !/^\+?[0-9 ()-]{8,20}$/.test(trimmed.phone)) errors.phone = "Enter a valid phone number.";
+    Object.entries(MAX_LENGTHS).forEach(([field, max]) => { if (trimmed[field].length > max) errors[field] = `Keep this under ${max} characters.`; });
+    setFieldErrors(errors);
+    return { valid: Object.keys(errors).length === 0, trimmed };
+  };
+
+  const handleAvatarChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/") || file.size > 5 * 1024 * 1024) {
+      setFieldErrors((prev) => ({ ...prev, avatar: "Choose an image up to 5 MB." }));
+      e.target.value = "";
+      return;
+    }
+    setAvatarFile(file);
+    setAvatarPreview(URL.createObjectURL(file));
+    setFieldErrors((prev) => ({ ...prev, avatar: "" }));
   };
 
   const handleSaveProfile = async (e) => {
     e.preventDefault();
     setEditError("");
+    const validation = validateForm();
+    if (!validation.valid) return;
     setSaving(true);
     try {
       const data = new FormData();
-      Object.entries(formData).forEach(([key, value]) => data.append(key, value));
+      Object.entries(validation.trimmed).forEach(([key, value]) => data.append(key, value));
       if (avatarFile) data.append("avatar", avatarFile);
       await api.patch("/seller/profile", data, {
         headers: { "Content-Type": "multipart/form-data" },
@@ -104,6 +148,14 @@ function SellerProfile() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const toggleEditing = () => {
+    if (editing) {
+      setProfileForm(profile.seller);
+      setEditError("");
+    }
+    setEditing((prev) => !prev);
   };
 
   if (loading) {
@@ -141,11 +193,11 @@ function SellerProfile() {
       <Navbar />
       <main className="max-w-6xl mx-auto px-6 py-8">
         <section className="overflow-hidden rounded-xl border border-gray-200 bg-white mb-6">
-          <div className="h-24 bg-gradient-to-r from-blue-600 via-sky-500 to-emerald-400" />
+          <div className="h-2 bg-blue-600" />
           <div className="px-6 pb-6">
-            <div className="-mt-10 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+            <div className="flex flex-col gap-6 pt-5 lg:flex-row lg:items-start lg:justify-between">
               <div className="flex items-end gap-4">
-                <div className="h-20 w-20 overflow-hidden rounded-full border-4 border-white bg-blue-700 flex items-center justify-center text-2xl font-bold text-white shadow-sm">
+                <div className="h-20 w-20 overflow-hidden rounded-full border border-gray-200 bg-blue-700 flex items-center justify-center text-2xl font-bold text-white shadow-sm">
                   {seller.avatar ? (
                     <img
                       src={seller.avatar}
@@ -181,10 +233,7 @@ function SellerProfile() {
                 {isOwnProfile && (
                   <button
                     type="button"
-                    onClick={() => {
-                      setEditing((prev) => !prev);
-                      setEditError("");
-                    }}
+                    onClick={toggleEditing}
                     className="rounded-full border border-gray-300 px-5 py-2 text-sm font-semibold text-gray-700 transition hover:border-blue-500 hover:text-blue-600"
                   >
                     {editing ? "Cancel editing" : "Edit profile"}
@@ -201,12 +250,17 @@ function SellerProfile() {
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <label className="text-sm font-medium text-gray-700 md:col-span-2">
                     Store avatar
+                    {avatarPreview && (
+                      <img src={avatarPreview} alt="Store avatar preview" className="mb-2 h-16 w-16 rounded-full object-cover ring-2 ring-white" />
+                    )}
                     <input
                       type="file"
                       accept="image/*"
-                      onChange={(e) => setAvatarFile(e.target.files?.[0] || null)}
+                      onChange={handleAvatarChange}
                       className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-600"
                     />
+                    <span className="mt-1 block text-xs font-normal text-gray-500">JPG, PNG or WebP, up to 5 MB.</span>
+                    {fieldErrors.avatar && <span className="mt-1 block text-xs font-normal text-red-600">{fieldErrors.avatar}</span>}
                   </label>
                   <label className="text-sm font-medium text-gray-700">
                     Display name
@@ -214,8 +268,11 @@ function SellerProfile() {
                       name="name"
                       value={formData.name}
                       onChange={handleChange}
-                      className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                      maxLength={MAX_LENGTHS.name}
+                      aria-invalid={Boolean(fieldErrors.name)}
+                      className={fieldClass(fieldErrors.name)}
                     />
+                    <FieldError message={fieldErrors.name} />
                   </label>
                   <label className="text-sm font-medium text-gray-700">
                     Username
@@ -223,8 +280,11 @@ function SellerProfile() {
                       name="username"
                       value={formData.username}
                       onChange={handleChange}
-                      className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                      maxLength={MAX_LENGTHS.username}
+                      aria-invalid={Boolean(fieldErrors.username)}
+                      className={fieldClass(fieldErrors.username)}
                     />
+                    <FieldError message={fieldErrors.username} />
                   </label>
                   <label className="text-sm font-medium text-gray-700">
                     Store name
@@ -232,8 +292,11 @@ function SellerProfile() {
                       name="storeName"
                       value={formData.storeName}
                       onChange={handleChange}
-                      className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                      maxLength={MAX_LENGTHS.storeName}
+                      aria-invalid={Boolean(fieldErrors.storeName)}
+                      className={fieldClass(fieldErrors.storeName)}
                     />
+                    <FieldError message={fieldErrors.storeName} />
                   </label>
                   <label className="text-sm font-medium text-gray-700">
                     Phone
@@ -241,8 +304,11 @@ function SellerProfile() {
                       name="phone"
                       value={formData.phone}
                       onChange={handleChange}
-                      className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                      maxLength={MAX_LENGTHS.phone}
+                      aria-invalid={Boolean(fieldErrors.phone)}
+                      className={fieldClass(fieldErrors.phone)}
                     />
+                    <FieldError message={fieldErrors.phone} />
                   </label>
                   <label className="text-sm font-medium text-gray-700">
                     Location
@@ -250,7 +316,8 @@ function SellerProfile() {
                       name="location"
                       value={formData.location}
                       onChange={handleChange}
-                      className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                      maxLength={MAX_LENGTHS.location}
+                      className={fieldClass(fieldErrors.location)}
                     />
                   </label>
                   <label className="text-sm font-medium text-gray-700">
@@ -268,12 +335,15 @@ function SellerProfile() {
                   </label>
                   <label className="text-sm font-medium text-gray-700">
                     Response time
-                    <input
+                    <select
+                      id="seller-response-time"
                       name="responseTime"
                       value={formData.responseTime}
                       onChange={handleChange}
                       className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                    />
+                    >
+                      <option>Within 24 hours</option><option>Within 2 business days</option><option>Within 3 business days</option>
+                    </select>
                   </label>
                   <label className="text-sm font-medium text-gray-700">
                     Return policy
@@ -290,7 +360,8 @@ function SellerProfile() {
                       name="shippingFrom"
                       value={formData.shippingFrom}
                       onChange={handleChange}
-                      className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                      maxLength={MAX_LENGTHS.shippingFrom}
+                      className={fieldClass(fieldErrors.shippingFrom)}
                     />
                   </label>
                   <label className="text-sm font-medium text-gray-700 md:col-span-2">
@@ -300,8 +371,10 @@ function SellerProfile() {
                       value={formData.bio}
                       onChange={handleChange}
                       rows={3}
-                      className="mt-1 w-full resize-none rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                      maxLength={MAX_LENGTHS.bio}
+                      className={fieldClass(fieldErrors.bio) + " resize-none"}
                     />
+                    <FieldError message={fieldErrors.bio} />
                   </label>
                 </div>
                 {editError && (
@@ -344,55 +417,55 @@ function SellerProfile() {
               />
             </div>
 
-            <div className="mt-6 grid grid-cols-1 gap-4 rounded-xl border border-gray-200 bg-gray-50 p-4 lg:grid-cols-[1.4fr_1fr]">
-              <div>
-                <p className="text-xs font-semibold uppercase text-gray-400">
-                  About this seller
-                </p>
-                <p className="mt-2 text-sm leading-relaxed text-gray-700">
+            <div className="mt-6 border-t border-gray-200 pt-6">
+              <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1.25fr_1fr]">
+                <div>
+                <p className="text-sm font-semibold text-gray-900">About this seller</p>
+                <p className="mt-3 text-sm leading-6 text-gray-600">
                   {sellerInfo.bio ||
                     "This seller has not added a store introduction yet."}
                 </p>
-              </div>
-              <div className="grid grid-cols-1 gap-2 text-sm text-gray-600 sm:grid-cols-2 lg:grid-cols-1">
-                <div className="flex justify-between gap-4">
-                  <span className="text-gray-400">Location</span>
-                  <span className="font-medium text-gray-800">
+                </div>
+                <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2 lg:grid-cols-1">
+                <div className="flex justify-between gap-4 border-b border-gray-100 pb-2">
+                  <span className="text-gray-500">Location</span>
+                  <span className="text-right font-medium text-gray-900">
                     {sellerInfo.location || "Not provided"}
                   </span>
                 </div>
-                <div className="flex justify-between gap-4">
-                  <span className="text-gray-400">Ships from</span>
-                  <span className="font-medium text-gray-800">
+                <div className="flex justify-between gap-4 border-b border-gray-100 pb-2">
+                  <span className="text-gray-500">Ships from</span>
+                  <span className="text-right font-medium text-gray-900">
                     {sellerInfo.shippingFrom || "Not provided"}
                   </span>
                 </div>
-                <div className="flex justify-between gap-4">
-                  <span className="text-gray-400">Response</span>
-                  <span className="font-medium text-gray-800">
+                <div className="flex justify-between gap-4 border-b border-gray-100 pb-2">
+                  <span className="text-gray-500">Response</span>
+                  <span className="text-right font-medium text-gray-900">
                     {sellerInfo.responseTime || "Within 24 hours"}
                   </span>
                 </div>
-                <div className="flex justify-between gap-4">
-                  <span className="text-gray-400">Returns</span>
-                  <span className="font-medium text-gray-800">
+                <div className="flex justify-between gap-4 border-b border-gray-100 pb-2">
+                  <span className="text-gray-500">Returns</span>
+                  <span className="text-right font-medium text-gray-900">
                     {sellerInfo.returnPolicy || "30-day returns"}
                   </span>
                 </div>
-                <div className="flex justify-between gap-4">
-                  <span className="text-gray-400">Type</span>
-                  <span className="font-medium text-gray-800">
+                <div className="flex justify-between gap-4 border-b border-gray-100 pb-2">
+                  <span className="text-gray-500">Type</span>
+                  <span className="text-right font-medium text-gray-900">
                     {sellerInfo.businessType || "Individual"}
                   </span>
                 </div>
                 {sellerInfo.phone && (
-                  <div className="flex justify-between gap-4">
-                    <span className="text-gray-400">Phone</span>
-                    <span className="font-medium text-gray-800">
+                  <div className="flex justify-between gap-4 border-b border-gray-100 pb-2">
+                    <span className="text-gray-500">Phone</span>
+                    <span className="text-right font-medium text-gray-900">
                       {sellerInfo.phone}
                     </span>
                   </div>
                 )}
+                </div>
               </div>
             </div>
           </div>

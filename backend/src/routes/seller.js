@@ -9,7 +9,17 @@ router.get("/:id/profile", sellerController.getSellerProfile);
 router.use(authMiddleware);
 router.patch(
   "/profile",
-  upload.single("avatar"),
+  (req, res, next) => {
+    upload.single("avatar")(req, res, (err) => {
+      if (err) {
+        return res.status(400).json({
+          success: false,
+          message: err.message || "Unable to upload avatar",
+        });
+      }
+      next();
+    });
+  },
   sellerController.updateSellerProfile,
 );
 
