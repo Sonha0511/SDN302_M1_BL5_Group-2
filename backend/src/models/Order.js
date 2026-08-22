@@ -48,6 +48,12 @@ const orderSchema = new mongoose.Schema(
       ],
       default: "pending",
     },
+    appliedVoucher: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Voucher",
+      default: null,
+    },
+    discountAmount: { type: Number, default: 0 },
     paymentStatus: {
       type: String,
       enum: ["pending", "paid", "refunded"],

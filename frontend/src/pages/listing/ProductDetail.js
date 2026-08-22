@@ -399,6 +399,8 @@ function ProductDetail() {
   const [quantity, setQuantity] = useState(1);
   const [reviews, setReviews] = useState([]);
   const [showReviewModal, setShowReviewModal] = useState(false);
+  const [vouchers, setVouchers] = useState([]);
+  const [copiedCode, setCopiedCode] = useState("");
 
   useEffect(() => {
     fetchListing();
@@ -413,6 +415,10 @@ function ProductDetail() {
       ]);
       setListing(listingRes.data);
       setReviews(reviewRes.data);
+      try {
+        const voucherRes = await api.get(`/vouchers/listing/${id}`);
+        if (voucherRes.data.success) setVouchers(voucherRes.data.data);
+      } catch (_) {}
     } catch (err) {
       console.error(err);
     } finally {
@@ -571,6 +577,39 @@ function ProductDetail() {
                 {formatPrice(listing.pricing.fixedPrice)}
               </p>
             </div>
+
+            {/* Available Vouchers / Coupons */}
+            {vouchers.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-gray-500 uppercase">Available coupons</p>
+                {vouchers.map((v) => (
+                  <div
+                    key={v._id}
+                    className="flex items-center justify-between gap-3 rounded-lg border-2 border-dashed border-blue-400 bg-blue-50/60 px-4 py-2.5"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-blue-600 text-lg flex-shrink-0">🎫</span>
+                      <div className="min-w-0">
+                        <span className="font-mono font-bold text-sm text-blue-800 uppercase">{v.code}</span>
+                        <span className="text-xs text-gray-500 ml-2">
+                          {v.discountType === "percentage" ? `${v.discountValue}% off` : `${formatPrice(v.discountValue)} off`}
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(v.code);
+                        setCopiedCode(v.code);
+                        setTimeout(() => setCopiedCode(""), 2000);
+                      }}
+                      className="flex-shrink-0 rounded-full border border-blue-500 bg-white px-3 py-1 text-xs font-bold text-blue-600 hover:bg-blue-600 hover:text-white transition"
+                    >
+                      {copiedCode === v.code ? "Copied!" : "Copy code"}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* Shipping */}
             <div className="bg-gray-50 rounded-xl p-3 text-sm">

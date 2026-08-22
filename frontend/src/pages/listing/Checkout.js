@@ -54,9 +54,45 @@ function Checkout() {
     }
   };
 
+  const [voucherCode, setVoucherCode] = useState("");
+  const [discountAmount, setDiscountAmount] = useState(0);
+  const [appliedVoucher, setAppliedVoucher] = useState(null);
+  const [voucherError, setVoucherError] = useState("");
+  const [validatingVoucher, setValidatingVoucher] = useState(false);
+
   const shippingCost = 30000;
   const subtotal = listing ? listing.pricing.fixedPrice * quantity : 0;
-  const total = subtotal + shippingCost;
+  const total = subtotal + shippingCost - discountAmount;
+
+  const handleApplyVoucher = async () => {
+    if (!voucherCode.trim()) return;
+    setVoucherError("");
+    setDiscountAmount(0);
+    setAppliedVoucher(null);
+    setValidatingVoucher(true);
+    try {
+      const res = await api.post("/vouchers/validate", {
+        code: voucherCode.trim(),
+        listingId: id,
+        subtotal
+      });
+      if (res.data.success) {
+        setDiscountAmount(res.data.data.discountAmount);
+        setAppliedVoucher(res.data.data);
+      }
+    } catch (err) {
+      setVoucherError(err.response?.data?.message || "Mã giảm giá không hợp lệ.");
+    } finally {
+      setValidatingVoucher(false);
+    }
+  };
+
+  const handleRemoveVoucher = () => {
+    setVoucherCode("");
+    setDiscountAmount(0);
+    setAppliedVoucher(null);
+    setVoucherError("");
+  };
 
   const handleSubmit = async () => {
     if (
@@ -76,6 +112,7 @@ function Checkout() {
         quantity,
         paymentMethod,
         shippingAddress: address,
+        voucherCode: appliedVoucher ? appliedVoucher.code : undefined,
       });
       navigate(`/orders/${res.data._id}?success=true`);
     } catch (err) {
@@ -364,10 +401,50 @@ function Checkout() {
                     {formatPrice(shippingCost)}
                   </span>
                 </div>
+                {discountAmount > 0 && (
+                  <div className="flex justify-between text-green-600 font-semibold">
+                    <span>Coupon savings ({appliedVoucher?.code})</span>
+                    <span>-{formatPrice(discountAmount)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between font-bold text-gray-900 text-xl border-t border-gray-200 pt-4 mt-1">
                   <span>Order total</span>
                   <span>{formatPrice(total)}</span>
                 </div>
+              </div>
+
+              {/* Voucher promo input block */}
+              <div className="mt-6 border-t border-gray-200 pt-4">
+                <p className="text-sm font-semibold text-gray-700 mb-2">Voucher / Coupon Code</p>
+                {appliedVoucher ? (
+                  <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-lg p-2 text-sm text-green-800">
+                    <span>Code <strong>{appliedVoucher.code}</strong> applied!</span>
+                    <button onClick={handleRemoveVoucher} className="text-xs font-bold text-red-600 hover:underline">Remove</button>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Enter code"
+                        value={voucherCode}
+                        onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
+                        disabled={validatingVoucher}
+                        className="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm outline-none uppercase focus:border-blue-600 bg-white"
+                      />
+                      <button
+                        onClick={handleApplyVoucher}
+                        disabled={validatingVoucher || !voucherCode.trim()}
+                        className="bg-blue-600 text-white font-bold text-xs rounded-lg px-4 py-2 hover:bg-blue-700 disabled:opacity-50 transition"
+                      >
+                        {validatingVoucher ? "..." : "Apply"}
+                      </button>
+                    </div>
+                    {voucherError && (
+                      <p className="text-xs text-red-600 mt-1.5">{voucherError}</p>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Policy note */}

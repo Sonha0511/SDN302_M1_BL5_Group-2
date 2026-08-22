@@ -1,10 +1,11 @@
 const Order = require("../models/Order");
 const Listing = require("../models/Listing");
+const Voucher = require("../models/Voucher");
 
 // POST /api/orders - tạo đơn hàng
 exports.createOrder = async (req, res) => {
   try {
-    const { listingId, quantity, shippingAddress, paymentMethod } = req.body;
+    const { listingId, quantity, shippingAddress, paymentMethod, voucherCode } = req.body;
 
     const listing = await Listing.findById(listingId);
     if (!listing)
@@ -22,7 +23,52 @@ exports.createOrder = async (req, res) => {
     const itemPrice = listing.pricing.fixedPrice;
     const subtotal = itemPrice * quantity;
     const shippingCost = 30000;
-    const total = subtotal + shippingCost;
+
+    let discountAmount = 0;
+    let appliedVoucherId = null;
+
+    if (voucherCode) {
+      const voucher = await Voucher.findOne({ code: voucherCode.toUpperCase(), isActive: true });
+      if (!voucher) {
+        return res.status(400).json({ message: "Mã giảm giá không tồn tại hoặc đã hết hạn" });
+      }
+      if (String(voucher.listingId) !== String(listingId)) {
+        return res.status(400).json({ message: "Mã giảm giá không áp dụng cho sản phẩm này" });
+      }
+      const now = new Date();
+      if (voucher.startDate > now || voucher.endDate < now) {
+        return res.status(400).json({ message: "Mã giảm giá đã hết hạn hoặc chưa kích hoạt" });
+      }
+      if (voucher.usageLimit !== null && voucher.usedCount >= voucher.usageLimit) {
+        return res.status(400).json({ message: "Mã giảm giá đã hết lượt sử dụng" });
+      }
+      if (subtotal < voucher.minOrderValue) {
+        return res.status(400).json({ 
+          message: `Mã giảm giá yêu cầu giá trị đơn hàng tối thiểu ₫${voucher.minOrderValue.toLocaleString("vi-VN")}` 
+        });
+      }
+
+      if (voucher.discountType === "fixed") {
+        discountAmount = voucher.discountValue;
+      } else if (voucher.discountType === "percentage") {
+        discountAmount = (subtotal * voucher.discountValue) / 100;
+        if (voucher.maxDiscountAmount > 0 && discountAmount > voucher.maxDiscountAmount) {
+          discountAmount = voucher.maxDiscountAmount;
+        }
+      }
+
+      if (discountAmount > subtotal) {
+        discountAmount = subtotal;
+      }
+
+      appliedVoucherId = voucher._id;
+
+      // Cập nhật số lượng đã sử dụng
+      voucher.usedCount += 1;
+      await voucher.save();
+    }
+
+    const total = subtotal + shippingCost - discountAmount;
 
     const order = await Order.create({
       buyerId: req.userId,
@@ -43,6 +89,8 @@ exports.createOrder = async (req, res) => {
       paymentMethod,
       status: "awaiting_shipment",
       paymentStatus: paymentMethod === "COD" ? "pending" : "paid",
+      appliedVoucher: appliedVoucherId,
+      discountAmount,
     });
 
     listing.totalQuantity -= quantity;
