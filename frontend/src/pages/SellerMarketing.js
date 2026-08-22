@@ -119,6 +119,20 @@ export default function SellerMarketing() {
     }
   };
 
+  const handleToggleActiveVoucher = async (voucherId, currentActive) => {
+    setError("");
+    setSuccess("");
+    try {
+      const res = await api.patch(`/vouchers/${voucherId}/toggle`);
+      if (res.data.success) {
+        setSuccess(`Voucher is now ${!currentActive ? "Active" : "Paused"}.`);
+        setVouchers(current => current.map(v => v._id === voucherId ? { ...v, isActive: !currentActive } : v));
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || "Unable to update voucher status.");
+    }
+  };
+
   const handleDeleteVoucher = async (voucherId) => {
     if (!window.confirm("Are you sure you want to delete this voucher?")) return;
     setError("");
@@ -481,6 +495,7 @@ export default function SellerMarketing() {
                             <th className="p-4">Discount</th>
                             <th className="p-4">Min. Subtotal</th>
                             <th className="p-4">Usage</th>
+                            <th className="p-4">Status</th>
                             <th className="p-4">Ends On</th>
                             <th className="p-4 text-right">Actions</th>
                           </tr>
@@ -520,10 +535,21 @@ export default function SellerMarketing() {
                                   <span>{voucher.usedCount}</span>
                                 )}
                               </td>
+                              <td className="p-4 align-middle">
+                                <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${voucher.isActive ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"}`}>
+                                  {voucher.isActive ? "Active" : "Paused"}
+                                </span>
+                              </td>
                               <td className="p-4 align-middle text-xs">
                                 {formatDate(voucher.endDate)}
                               </td>
-                              <td className="p-4 align-middle text-right">
+                              <td className="p-4 align-middle text-right space-x-3">
+                                <button
+                                  onClick={() => handleToggleActiveVoucher(voucher._id, voucher.isActive)}
+                                  className="text-sm font-semibold text-blue-600 hover:underline"
+                                >
+                                  {voucher.isActive ? "Pause" : "Resume"}
+                                </button>
                                 <button
                                   onClick={() => handleDeleteVoucher(voucher._id)}
                                   className="text-sm font-semibold text-red-600 hover:underline"

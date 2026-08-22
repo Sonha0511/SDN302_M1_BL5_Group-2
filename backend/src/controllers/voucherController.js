@@ -56,7 +56,31 @@ exports.getSellerVouchers = async (req, res) => {
   }
 };
 
-// 3. Seller xóa mã giảm giá
+// 3. Seller Pause/Resume (Tạm dừng / Kích hoạt lại) mã giảm giá chuẩn theo eBay
+exports.toggleVoucherStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.id || req.user?._id || req.userId;
+
+    const voucher = await Voucher.findOne({ _id: id, sellerId: userId });
+    if (!voucher) {
+      return res.status(404).json({ success: false, message: "Voucher not found or access denied." });
+    }
+
+    voucher.isActive = !voucher.isActive;
+    await voucher.save();
+    return res.status(200).json({ 
+      success: true, 
+      data: voucher, 
+      message: `Voucher is now ${voucher.isActive ? "Active" : "Paused"}.` 
+    });
+  } catch (error) {
+    console.error("🔥 Error in toggleVoucherStatus:", error.message);
+    return res.status(500).json({ success: false, message: "Server Error: " + error.message });
+  }
+};
+
+// 4. Seller xóa mã giảm giá
 exports.deleteVoucher = async (req, res) => {
   try {
     const { id } = req.params;

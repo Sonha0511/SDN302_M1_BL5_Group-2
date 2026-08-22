@@ -4,6 +4,7 @@ const auth = require("../middleware/auth");
 const {
   createVoucher,
   getSellerVouchers,
+  toggleVoucherStatus,
   deleteVoucher,
   getListingVouchers,
   validateVoucher,
@@ -28,6 +29,7 @@ router.use(auth);
 router.use(isSeller);
 router.post("/", createVoucher);
 router.get("/seller", getSellerVouchers);
+router.patch("/:id/toggle", toggleVoucherStatus);
 router.delete("/:id", deleteVoucher);
 
 module.exports = router;
