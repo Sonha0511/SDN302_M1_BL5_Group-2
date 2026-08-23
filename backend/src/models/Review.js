@@ -52,12 +52,6 @@ const reviewSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
-    // A public, single seller response mirrors the marketplace feedback model:
-    // it provides context without allowing the original buyer feedback to be changed.
-    sellerResponse: {
-      comment: { type: String, trim: true, maxlength: 500 },
-      respondedAt: { type: Date },
-    },
   },
   { timestamps: true },
 );
