@@ -549,6 +549,16 @@ function SellerProfile() {
                   <p className="mt-3 pl-12 text-sm leading-relaxed text-gray-600">
                     {review.comment}
                   </p>
+                  {review.sellerResponse?.comment && (
+                    <div className="mt-4 ml-12 rounded-lg border border-blue-100 bg-blue-50 p-4">
+                      <p className="text-xs font-bold uppercase tracking-wide text-blue-800">
+                        Response from seller
+                      </p>
+                      <p className="mt-1 text-sm leading-relaxed text-gray-700">
+                        {review.sellerResponse.comment}
+                      </p>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

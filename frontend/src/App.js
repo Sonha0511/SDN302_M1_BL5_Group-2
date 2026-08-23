@@ -11,6 +11,7 @@ import ProductListing from "./pages/listing/ProductListing";
 import ProductDetail from "./pages/listing/ProductDetail";
 import Checkout from "./pages/listing/Checkout";
 import ReviewOrder from "./pages/listing/ReviewOrder";
+import SellerFeedback from "./pages/SellerFeedback";
 import NotFound from "./pages/NotFound";
 import Messages from "./pages/chat/Messages";
 import SellerListings from "./pages/SellerListings";
@@ -21,6 +22,8 @@ import Sell from "./pages/Sell";
 import SellStart from "./pages/SellStart";
 import SellerOrders from "./pages/SellerOrders";
 import SellerMarketing from "./pages/SellerMarketing";
+import SellerOverview from "./pages/SellerOverview";
+import SellerDisputes from "./pages/SellerDisputes";
 import MyOrders from "./pages/orders/MyOrders";
 import OrderDetail from "./pages/orders/OrderDetail";
 import CreateDispute from "./pages/dispute/CreateDispute";
@@ -47,16 +50,18 @@ function App() {
           <Route path="/sell" element={<Sell />} />
           <Route path="/sell/start" element={<SellStart />} />
           <Route path="/seller/listings" element={<SellerListings />} />
+          <Route path="/seller/overview" element={<SellerOverview />} />
           <Route path="/seller/inventory" element={<SellerInventory />} />
           <Route path="/seller/listings/:id/edit" element={<SellerEditListing />} />
           <Route path="/seller/marketing" element={<SellerMarketing />} />
           <Route path="/seller/orders" element={<SellerOrders />} />
+          <Route path="/seller/disputes" element={<SellerDisputes />} />
+          <Route path="/seller/feedback" element={<SellerFeedback />} />
           <Route path="/seller/:id" element={<SellerProfile />} />
-          <Route path="*" element={<NotFound />} />
           <Route path="/disputes/create/:orderId" element={<CreateDispute />} />
           <Route path="/disputes/my" element={<DisputeList />} />
           <Route path="/disputes/:id" element={<DisputeDetail />} />
-
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

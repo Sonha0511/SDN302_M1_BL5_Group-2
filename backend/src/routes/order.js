@@ -7,6 +7,7 @@ const {
   getSellerOrders,
   getOrder,
   updateOrderStatus,
+  confirmOrder,
   cancelOrder,
 } = require("../controllers/orderController");
 
@@ -15,6 +16,7 @@ router.get("/my", auth, getMyOrders);
 router.get("/seller", auth, getSellerOrders);
 router.get("/:id", auth, getOrder);
 router.patch("/:id/status", auth, updateOrderStatus);
+router.patch("/:id/confirm", auth, confirmOrder);
 router.patch("/:id/cancel", auth, cancelOrder);
 
 module.exports = router;

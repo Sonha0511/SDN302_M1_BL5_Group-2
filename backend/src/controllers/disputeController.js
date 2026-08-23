@@ -1,20 +1,75 @@
 const Dispute = require("../models/Dispute");
 const Order = require("../models/Order");
 
-// [POST] Tạo khiếu nại mới
+// Which statuses each role is allowed to move a dispute into
+const ALLOWED_TRANSITIONS = {
+  seller: [
+    "SELLER_RESPONDED",
+    "RESOLVED_REFUND",
+    "RESOLVED_REPLACE",
+    "RESOLVED_REJECTED",
+  ],
+  buyer: ["ESCALATED", "CLOSED"],
+  admin: [
+    "SELLER_RESPONDED",
+    "ESCALATED",
+    "UNDER_REVIEW",
+    "RESOLVED_REFUND",
+    "RESOLVED_REPLACE",
+    "RESOLVED_REJECTED",
+    "CLOSED",
+  ],
+};
+
+// Human readable note stored on the timeline for each status
+const TIMELINE_NOTES = {
+  SELLER_RESPONDED: "Seller replied to the buyer",
+  ESCALATED: "Buyer asked eBay to step in and help",
+  UNDER_REVIEW: "eBay is reviewing this request",
+  RESOLVED_REFUND: "Request closed with a refund",
+  RESOLVED_REPLACE: "Request closed with a replacement",
+  RESOLVED_REJECTED: "Request was declined",
+  CLOSED: "Request was closed",
+};
+
+// The resolution recorded automatically when a case reaches a final status
+const RESOLUTION_BY_STATUS = {
+  RESOLVED_REFUND: "REFUND_FULL",
+  RESOLVED_REPLACE: "REPLACEMENT",
+  RESOLVED_REJECTED: "REJECTED",
+};
+
+// [POST] /api/disputes - open a new request against an order
 exports.createDispute = async (req, res) => {
   try {
     const { orderId, reason, description, evidenceImages } = req.body;
 
-    // Truy vấn đơn hàng gốc để tìm chính xác chủ shop là ai
+    // Read the original order so we know exactly who the seller is
     const order = await Order.findById(orderId);
     if (!order) {
-      return res.status(404).json({ message: "Không tìm thấy đơn hàng tham chiếu" });
+      return res.status(404).json({ message: "Related order not found" });
+    }
+
+    if (order.buyerId.toString() !== req.userId) {
+      return res
+        .status(403)
+        .json({ message: "You can only open a request for your own order" });
+    }
+
+    const existing = await Dispute.findOne({
+      orderId: order._id,
+      status: { $nin: ["CLOSED", "RESOLVED_REJECTED"] },
+    });
+    if (existing) {
+      return res.status(409).json({
+        message: "There is already an open request for this order",
+        disputeId: existing._id,
+      });
     }
 
     const newDispute = new Dispute({
       orderId: order._id,
-      sellerId: order.sellerId, // Bốc chuẩn ID của Seller từ Database Order sang
+      sellerId: order.sellerId, // Take the seller straight from the order
       buyerId: req.userId,
       reason,
       description,
@@ -23,123 +78,173 @@ exports.createDispute = async (req, res) => {
         {
           actor: "buyer",
           action: "created",
-          note: "Người mua đã tạo khiếu nại"
-        }
-      ]
+          note: "Buyer opened this request",
+        },
+      ],
     });
 
     await newDispute.save();
 
     // ---------------------------------------------------------
-    // MOCK NOTIFICATION CHO ADMIN
+    // MOCK ADMIN NOTIFICATION
     // ---------------------------------------------------------
     console.log("\n=================================================");
-    console.log(`🚨 [SYSTEM MOCK] THÔNG BÁO GỬI TỚI ADMIN`);
-    console.log(`- Có khiếu nại mới từ Đơn hàng: ${order._id}`);
-    console.log(`- Lý do: ${reason}`);
-    console.log(`- Người mua (Buyer ID): ${req.userId}`);
+    console.log("[SYSTEM MOCK] NOTIFICATION SENT TO ADMIN");
+    console.log(`- New request on order: ${order._id}`);
+    console.log(`- Reason: ${reason}`);
+    console.log(`- Buyer ID: ${req.userId}`);
     console.log("=================================================\n");
 
     res.status(201).json(newDispute);
   } catch (error) {
-    res.status(500).json({ message: "Lỗi server khi tạo khiếu nại" });
+    res
+      .status(500)
+      .json({ message: "Server error while creating the request" });
   }
 };
 
-// [GET] Lấy danh sách khiếu nại (Có phân quyền)
+// [GET] /api/disputes - list requests, scoped to the caller's role
 exports.getDisputes = async (req, res) => {
   try {
-    let filter = {};
-    
-    // Phân luồng dữ liệu cực kỳ nghiêm ngặt
+    const filter = {};
+
+    // Strict data separation between roles
     if (req.userRole === "buyer") {
-      filter.buyerId = req.userId; // Buyer chỉ thấy đơn mình đi kiện
+      filter.buyerId = req.userId; // Buyers only see requests they opened
     } else if (req.userRole === "seller") {
-      filter.sellerId = req.userId; // Seller chỉ thấy đơn mình bị kiện
-    } 
-    // Nếu là admin thì giữ filter rỗng {} để xem toàn bộ hệ thống
+      filter.sellerId = req.userId; // Sellers only see requests against them
+    }
+    // Admins keep an empty filter so they see every case
+
+    if (req.query.status) {
+      filter.status = req.query.status;
+    }
 
     const disputes = await Dispute.find(filter)
-      .populate("orderId", "listingTitle images") // Lấy thông tin cơ bản của đơn
+      .populate(
+        "orderId",
+        "listingTitle listingImage quantity pricing status createdAt",
+      )
+      .populate("buyerId", "username name email")
+      .populate("sellerId", "username name email")
       .sort({ createdAt: -1 });
 
     res.status(200).json(disputes);
   } catch (error) {
-    res.status(500).json({ message: "Lỗi tải danh sách khiếu nại" });
+    res.status(500).json({ message: "Unable to load the request list" });
   }
 };
 
-// [PATCH] Cập nhật trạng thái và ghi nhận Timeline
+// [PATCH] /api/disputes/:id - move the case forward and log the timeline
 exports.updateDisputeStatus = async (req, res) => {
   try {
-    const { status, sellerResponse } = req.body;
-    
-    // Tạo bản ghi lịch sử mới dựa trên người đang thao tác
-    let actorRole = req.userRole || "system";
-    let actionNote = "Cập nhật trạng thái";
+    const { status, sellerResponse, resolutionNote, resolutionAmount } =
+      req.body;
 
-    if (status === "SELLER_RESPONDED") {
-      actionNote = `Shop đã phản hồi: ${sellerResponse}`;
-    } else if (status === "CLOSED") {
-      actionNote = "Khiếu nại đã được rút lại / đóng";
+    const dispute = await Dispute.findById(req.params.id);
+    if (!dispute) {
+      return res.status(404).json({ message: "Request not found" });
     }
 
-    const newTimelineEvent = {
+    // Work out how the caller relates to this specific case
+    let actorRole = "system";
+    if (req.userRole === "admin") {
+      actorRole = "admin";
+    } else if (dispute.sellerId.toString() === req.userId) {
+      actorRole = "seller";
+    } else if (dispute.buyerId.toString() === req.userId) {
+      actorRole = "buyer";
+    } else {
+      return res
+        .status(403)
+        .json({ message: "You don't have access to this request" });
+    }
+
+    if (!(ALLOWED_TRANSITIONS[actorRole] || []).includes(status)) {
+      return res
+        .status(400)
+        .json({ message: `A ${actorRole} cannot set the status to ${status}` });
+    }
+
+    if (status === "SELLER_RESPONDED" && !sellerResponse?.trim()) {
+      return res.status(400).json({ message: "A reply message is required" });
+    }
+
+    dispute.status = status;
+
+    if (sellerResponse?.trim()) {
+      dispute.sellerResponse = sellerResponse.trim();
+    }
+
+    if (RESOLUTION_BY_STATUS[status]) {
+      dispute.resolution = {
+        type:
+          status === "RESOLVED_REFUND" && resolutionAmount
+            ? "REFUND_PARTIAL"
+            : RESOLUTION_BY_STATUS[status],
+        amount: resolutionAmount || undefined,
+        note: resolutionNote || TIMELINE_NOTES[status],
+        resolvedBy: req.userId,
+        resolvedAt: new Date(),
+      };
+    }
+
+    // Push the new event onto the history array
+    dispute.timeline.push({
       actor: actorRole,
       action: status,
-      note: actionNote,
-      timestamp: new Date()
-    };
+      note:
+        status === "SELLER_RESPONDED"
+          ? `Seller replied: ${sellerResponse.trim()}`
+          : resolutionNote || TIMELINE_NOTES[status] || "Status updated",
+      timestamp: new Date(),
+    });
 
-    const dispute = await Dispute.findByIdAndUpdate(
-      req.params.id,
-      { 
-        status: status, 
-        sellerResponse: sellerResponse,
-        $push: { timeline: newTimelineEvent } // Nhét sự kiện mới vào mảng
-      },
-      { new: true }
-    );
-
-    if (!dispute) {
-      return res.status(404).json({ message: "Không tìm thấy khiếu nại" });
-    }
+    await dispute.save();
 
     res.status(200).json(dispute);
   } catch (error) {
-    res.status(500).json({ message: "Lỗi cập nhật trạng thái" });
+    res.status(500).json({ message: "Unable to update the request status" });
   }
 };
 
-// [GET] Lấy chi tiết khiếu nại
+// [GET] /api/disputes/:id - read one request
 exports.getDisputeById = async (req, res) => {
   try {
     const dispute = await Dispute.findById(req.params.id)
-      .populate("orderId", "listingTitle")
-      .populate("sellerId", "username email");
+      .populate(
+        "orderId",
+        "listingTitle listingImage quantity pricing status paymentMethod shippingAddress createdAt",
+      )
+      .populate("buyerId", "username name email")
+      .populate("sellerId", "username name email");
 
     if (!dispute) {
-      return res.status(404).json({ message: "Không tìm thấy khiếu nại" });
+      return res.status(404).json({ message: "Request not found" });
     }
 
-    // Lấy ID thật (do dùng populate nên sellerId có thể bị biến thành Object)
-    const actualSellerId = dispute.sellerId?._id 
-      ? dispute.sellerId._id.toString() 
+    // Populate turns the ids into objects, so read the real id back out
+    const actualSellerId = dispute.sellerId?._id
+      ? dispute.sellerId._id.toString()
       : dispute.sellerId.toString();
 
-    const actualBuyerId = dispute.buyerId.toString();
+    const actualBuyerId = dispute.buyerId?._id
+      ? dispute.buyerId._id.toString()
+      : dispute.buyerId.toString();
 
-    // KIỂM TRA QUYỀN TRUY CẬP CHÉO
+    // Block cross-account access
     if (
-      req.userRole !== "admin" && 
-      req.userId !== actualBuyerId && 
+      req.userRole !== "admin" &&
+      req.userId !== actualBuyerId &&
       req.userId !== actualSellerId
     ) {
-      return res.status(403).json({ message: "Cảnh báo: Bạn không có quyền xem khiếu nại của Shop khác!" });
+      return res
+        .status(403)
+        .json({ message: "You don't have access to this request" });
     }
 
     res.status(200).json(dispute);
   } catch (error) {
-    res.status(500).json({ message: "Lỗi server khi lấy chi tiết" });
+    res.status(500).json({ message: "Server error while loading the request" });
   }
 };

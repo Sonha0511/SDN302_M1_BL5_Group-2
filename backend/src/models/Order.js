@@ -43,6 +43,7 @@ const orderSchema = new mongoose.Schema(
         "awaiting_shipment",
         "shipped",
         "delivered",
+        "delivery_failed",
         "cancelled",
         "returned",
       ],
@@ -54,6 +55,8 @@ const orderSchema = new mongoose.Schema(
       default: null,
     },
     discountAmount: { type: Number, default: 0 },
+    sellerConfirmed: { type: Boolean, default: false },
+    sellerConfirmedAt: { type: Date },
     paymentStatus: {
       type: String,
       enum: ["pending", "paid", "refunded"],
