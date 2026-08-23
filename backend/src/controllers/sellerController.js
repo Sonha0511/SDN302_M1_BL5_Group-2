@@ -126,15 +126,12 @@ exports.updateSellerProfile = async (req, res) => {
 
     seller.sellerProfile = {
       ...seller.sellerProfile,
-<<<<<<< HEAD
-      storeName: storeName?.trim() || seller.sellerProfile?.storeName || "",
-      bio: bio?.trim() || seller.sellerProfile?.bio || "",
-      phone: phone?.trim() || seller.sellerProfile?.phone || "",
-      location: location?.trim() || seller.sellerProfile?.location || "",
+      storeName: normalized.storeName || seller.sellerProfile?.storeName || "",
+      bio: normalized.bio || seller.sellerProfile?.bio || "",
+      phone: normalized.phone || seller.sellerProfile?.phone || "",
+      location: normalized.location || seller.sellerProfile?.location || "",
       businessType:
-        businessType?.trim() ||
-        seller.sellerProfile?.businessType ||
-        "Individual",
+        businessType?.trim() || seller.sellerProfile?.businessType || "Individual",
       responseTime:
         responseTime?.trim() ||
         seller.sellerProfile?.responseTime ||
@@ -144,17 +141,7 @@ exports.updateSellerProfile = async (req, res) => {
         seller.sellerProfile?.returnPolicy ||
         "30-day returns",
       shippingFrom:
-        shippingFrom?.trim() || seller.sellerProfile?.shippingFrom || "",
-=======
-      storeName: normalized.storeName,
-      bio: normalized.bio,
-      phone: normalized.phone,
-      location: normalized.location,
-      businessType,
-      responseTime,
-      returnPolicy,
-      shippingFrom: normalized.shippingFrom,
->>>>>>> 3271e1683c380ea4af62f1512846d4f209d918f9
+        normalized.shippingFrom || seller.sellerProfile?.shippingFrom || "",
     };
 
     await seller.save();

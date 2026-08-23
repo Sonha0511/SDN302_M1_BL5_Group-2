@@ -10,6 +10,11 @@ const DETAIL_KEYS = [
   "shippingCost",
 ];
 
+const populateReview = (query) =>
+  query
+    .populate("buyerId", "name username avatar")
+    .populate("listingId", "title images");
+
 const updateListingRating = async (listingId) => {
   const stats = await Review.aggregate([
     { $match: { listingId: new mongoose.Types.ObjectId(listingId) } },
@@ -114,15 +119,54 @@ exports.createReview = async (req, res) => {
     await order.save();
     await updateListingRating(order.listingId);
 
-    const populatedReview = await Review.findById(review._id)
-      .populate("buyerId", "name username avatar")
-      .populate("listingId", "title images");
+    const populatedReview = await populateReview(Review.findById(review._id));
 
     res.status(201).json(populatedReview);
   } catch (error) {
     if (error.code === 11000) {
       return res.status(400).json({ message: "Feedback has already been left" });
     }
+    res.status(500).json({ message: error.message });
+  }
+};
+
+exports.respondToReview = async (req, res) => {
+  try {
+    const comment = typeof req.body.comment === "string" ? req.body.comment.trim() : "";
+
+    if (!comment) {
+      return res.status(400).json({ message: "Please enter a response" });
+    }
+    if (comment.length > 500) {
+      return res.status(400).json({ message: "Seller responses are limited to 500 characters" });
+    }
+
+    const review = await Review.findById(req.params.reviewId);
+    if (!review) {
+      return res.status(404).json({ message: "Feedback not found" });
+    }
+    if (review.sellerId.toString() !== req.userId) {
+      return res.status(403).json({ message: "Only the seller for this transaction can respond" });
+    }
+    if (review.sellerResponse?.comment) {
+      return res.status(400).json({ message: "A seller response has already been posted and cannot be edited" });
+    }
+
+    review.sellerResponse = { comment, respondedAt: new Date() };
+    await review.save();
+    res.json(await populateReview(Review.findById(review._id)));
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+exports.getMySellerReviews = async (req, res) => {
+  try {
+    const reviews = await populateReview(
+      Review.find({ sellerId: req.userId }).sort({ createdAt: -1 }),
+    );
+    res.json(reviews);
+  } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };

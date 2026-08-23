@@ -11,6 +11,7 @@ import ProductListing from "./pages/listing/ProductListing";
 import ProductDetail from "./pages/listing/ProductDetail";
 import Checkout from "./pages/listing/Checkout";
 import ReviewOrder from "./pages/listing/ReviewOrder";
+import SellerFeedback from "./pages/SellerFeedback";
 import NotFound from "./pages/NotFound";
 import Messages from "./pages/chat/Messages";
 import SellerListings from "./pages/SellerListings";
@@ -56,6 +57,7 @@ function App() {
           />
           <Route path="/seller/orders" element={<SellerOrders />} />
           <Route path="/seller/disputes" element={<SellerDisputes />} />
+          <Route path="/seller/feedback" element={<SellerFeedback />} />
           <Route path="/seller/:id" element={<SellerProfile />} />
           <Route path="/disputes/create/:orderId" element={<CreateDispute />} />
           <Route path="/disputes/my" element={<DisputeList />} />

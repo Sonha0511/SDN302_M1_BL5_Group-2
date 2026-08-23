@@ -761,6 +761,21 @@ function ProductDetail() {
                         Verified purchase
                       </p>
                     )}
+                    {review.sellerResponse?.comment && (
+                      <div className="ml-12 mt-4 rounded-lg border border-blue-100 bg-blue-50 p-4">
+                        <p className="text-xs font-bold uppercase tracking-wide text-blue-800">
+                          Response from seller
+                        </p>
+                        <p className="mt-1 text-sm leading-relaxed text-gray-700">
+                          {review.sellerResponse.comment}
+                        </p>
+                        {review.sellerResponse.respondedAt && (
+                          <p className="mt-2 text-xs text-gray-500">
+                            {new Date(review.sellerResponse.respondedAt).toLocaleDateString("vi-VN")}
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
