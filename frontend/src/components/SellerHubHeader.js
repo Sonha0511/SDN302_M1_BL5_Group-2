@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 const tabs = [
   ["overview", "Overview", "/seller/overview"],
   ["orders", "Orders", "/seller/orders"],
+  ["disputes", "Requests", "/seller/disputes"],
   ["listings", "Listings", "/seller/inventory"],
   ["feedback", "Feedback", "/seller/feedback"],
   ["marketing", "Marketing", null],
@@ -79,51 +80,33 @@ function SellerHubHeader({ active = "overview", user }) {
           <span className="hidden text-xs text-gray-600 lg:block">
             Advanced
           </span>
-          <span className="hidden flex-shrink-0 border-l border-gray-300 pl-7 text-xl font-bold sm:block">
+          <span className="hidden flex-shrink-0 whitespace-nowrap border-l border-gray-300 pl-7 text-xl font-bold sm:block">
             Seller Hub
           </span>
-          <nav className="ml-2 hidden min-w-0 flex-1 items-stretch gap-6 self-stretch xl:flex">
-            {tabs.map(([value, label, to]) =>
-              to ? (
-                <Link
-                  key={value}
-                  to={to}
-                  className={`flex items-center border-b-4 px-1 text-sm ${active === value ? "border-blue-600 font-bold text-blue-700" : "border-transparent hover:border-gray-300"}`}
-                >
-                  {label}
-                </Link>
-              ) : (
-                <span
-                  key={value}
-                  className="flex cursor-default items-center border-b-4 border-transparent px-1 text-sm text-gray-600"
-                >
-                  {label}
-                </span>
-              ),
-            )}
-          </nav>
           <Link
             to="/messages"
-            className="ml-auto hidden rounded-full border border-gray-400 px-5 py-2 text-sm font-semibold lg:block"
+            className="ml-auto hidden flex-shrink-0 whitespace-nowrap rounded-full border border-gray-400 px-5 py-2 text-sm font-semibold lg:block"
           >
             Messages (0)
           </Link>
         </div>
 
-        <nav className="mx-auto flex max-w-screen-2xl overflow-x-auto border-t border-gray-200">
-          {tabs.slice(0, 5).map(([value, label, to]) =>
+        {/* The Seller Hub tabs get their own row so they never collide with the
+            search bar, and scroll sideways instead of wrapping when space runs out. */}
+        <nav className="mx-auto flex max-w-screen-2xl gap-1 overflow-x-auto border-t border-gray-200">
+          {tabs.map(([value, label, to]) =>
             to ? (
               <Link
                 key={value}
                 to={to}
-                className={`whitespace-nowrap border-b-4 px-4 py-3 text-sm ${active === value ? "border-blue-600 font-bold text-blue-700" : "border-transparent"}`}
+                className={`flex-shrink-0 whitespace-nowrap border-b-4 px-4 py-3 text-sm ${active === value ? "border-blue-600 font-bold text-blue-700" : "border-transparent hover:border-gray-300"}`}
               >
                 {label}
               </Link>
             ) : (
               <span
                 key={value}
-                className="whitespace-nowrap border-b-4 border-transparent px-4 py-3 text-sm text-gray-500"
+                className="flex-shrink-0 cursor-default whitespace-nowrap border-b-4 border-transparent px-4 py-3 text-sm text-gray-500"
               >
                 {label}
               </span>
