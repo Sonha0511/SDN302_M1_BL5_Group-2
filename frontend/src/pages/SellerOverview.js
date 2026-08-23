@@ -46,7 +46,7 @@ export default function SellerOverview() {
       return;
     }
     if (user.role !== "seller") {
-      navigate("/sell");
+      navigate("/seller/register-notice");
       return;
     }
     loadDashboard();

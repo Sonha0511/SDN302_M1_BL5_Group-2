@@ -56,7 +56,7 @@ export default function SellerOrders() {
       return;
     }
     if (user.role !== "seller") {
-      navigate("/");
+      navigate("/seller/register-notice");
       return;
     }
     loadOrders();

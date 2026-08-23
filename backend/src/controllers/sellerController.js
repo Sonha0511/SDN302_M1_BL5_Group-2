@@ -126,22 +126,14 @@ exports.updateSellerProfile = async (req, res) => {
 
     seller.sellerProfile = {
       ...seller.sellerProfile,
-      storeName: normalized.storeName || seller.sellerProfile?.storeName || "",
-      bio: normalized.bio || seller.sellerProfile?.bio || "",
-      phone: normalized.phone || seller.sellerProfile?.phone || "",
-      location: normalized.location || seller.sellerProfile?.location || "",
-      businessType:
-        businessType?.trim() || seller.sellerProfile?.businessType || "Individual",
-      responseTime:
-        responseTime?.trim() ||
-        seller.sellerProfile?.responseTime ||
-        "Within 24 hours",
-      returnPolicy:
-        returnPolicy?.trim() ||
-        seller.sellerProfile?.returnPolicy ||
-        "30-day returns",
-      shippingFrom:
-        normalized.shippingFrom || seller.sellerProfile?.shippingFrom || "",
+      storeName: normalized.storeName,
+      bio: normalized.bio,
+      phone: normalized.phone,
+      location: normalized.location,
+      businessType,
+      responseTime,
+      returnPolicy,
+      shippingFrom: normalized.shippingFrom,
     };
 
     await seller.save();
@@ -190,6 +182,13 @@ exports.getSellerListings = async (req, res) => {
 // 2. Create a new product listing
 exports.createListing = async (req, res) => {
   try {
+    if (req.userRole !== "seller") {
+      return res.status(403).json({
+        success: false,
+        message: "Only registered and verified sellers are authorized to list products. Please complete seller registration.",
+      });
+    }
+
     const {
       title,
       subtitle,
