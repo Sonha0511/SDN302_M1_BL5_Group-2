@@ -29,6 +29,7 @@ import OrderDetail from "./pages/orders/OrderDetail";
 import CreateDispute from "./pages/dispute/CreateDispute";
 import DisputeList from "./pages/dispute/DisputeList";
 import DisputeDetail from "./pages/dispute/DisputeDetail";
+import SellerDisputes from "./pages/SellerDisputes";
 
 function App() {
   return (
@@ -49,14 +50,21 @@ function App() {
           <Route path="/orders/:id" element={<OrderDetail />} />
           <Route path="/sell" element={<Sell />} />
           <Route path="/sell/start" element={<SellStart />} />
-          <Route path="/seller/register-notice" element={<SellerRegisterNotice />} />
+          <Route
+            path="/seller/register-notice"
+            element={<SellerRegisterNotice />}
+          />
           <Route path="/become-seller" element={<SellerRegisterNotice />} />
           <Route path="/seller/listings" element={<SellerListings />} />
           <Route path="/seller/overview" element={<SellerOverview />} />
           <Route path="/seller/inventory" element={<SellerInventory />} />
-          <Route path="/seller/listings/:id/edit" element={<SellerEditListing />} />
+          <Route
+            path="/seller/listings/:id/edit"
+            element={<SellerEditListing />}
+          />
           <Route path="/seller/marketing" element={<SellerMarketing />} />
           <Route path="/seller/orders" element={<SellerOrders />} />
+          <Route path="/seller/disputes" element={<SellerDisputes />} />
           <Route path="/seller/feedback" element={<SellerFeedback />} />
           <Route path="/seller/:id" element={<SellerProfile />} />
           <Route path="*" element={<NotFound />} />

@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 const tabs = [
   ["overview", "Overview", "/seller/overview"],
   ["orders", "Orders", "/seller/orders"],
+  ["disputes", "Disputes", "/seller/disputes"],
   ["listings", "Listings", "/seller/inventory"],
   ["marketing", "Marketing", "/seller/marketing"],
   ["feedback", "Feedback", "/seller/feedback"],
@@ -50,11 +51,11 @@ function SellerHubHeader({ active = "overview", user }) {
         </div>
       </div>
 
-      <div className="border-t border-gray-200 px-5 lg:px-8">
-        <div className="mx-auto flex max-w-screen-2xl flex-wrap items-center gap-5 py-3">
+      <div className="border-t border-gray-200 px-4 sm:px-5 lg:px-8">
+        <div className="mx-auto flex max-w-screen-2xl flex-wrap items-center gap-3 py-3 lg:gap-5">
           <Link
             to="/"
-            className="flex-shrink-0 py-4 text-4xl font-bold italic tracking-tighter"
+            className="flex-shrink-0 py-2 text-4xl font-bold italic tracking-tighter"
           >
             <span className="text-red-600">e</span>
             <span className="text-blue-600">b</span>
@@ -66,64 +67,44 @@ function SellerHubHeader({ active = "overview", user }) {
             <br />
             category⌄
           </button>
-          <div className="order-3 flex h-12 min-w-[250px] flex-1 items-center rounded-full border-2 border-gray-800 px-4 text-gray-500 lg:order-none">
-            <span className="mr-3 text-xl">⌕</span>
-            <span>Search for anything</span>
-            <span className="ml-auto border-l border-gray-300 pl-4 text-xs">
+          <div className="order-3 flex h-11 min-w-0 flex-[1_1_240px] items-center rounded-full border-2 border-gray-800 px-3 text-gray-500 lg:order-none">
+            <span className="mr-2 flex-shrink-0 text-xl">⌕</span>
+            <span className="truncate">Search for anything</span>
+            <span className="ml-auto hidden flex-shrink-0 border-l border-gray-300 pl-3 text-xs sm:block">
               All Categories⌄
             </span>
           </div>
-          <button className="order-4 rounded-full bg-blue-600 px-8 py-3 text-sm font-bold text-white hover:bg-blue-700 lg:order-none">
+          <button className="order-4 rounded-full bg-blue-600 px-6 py-3 text-sm font-bold text-white hover:bg-blue-700 lg:order-none">
             Search
           </button>
           <span className="hidden text-xs text-gray-600 lg:block">
             Advanced
           </span>
-          <span className="hidden flex-shrink-0 border-l border-gray-300 pl-7 text-xl font-bold sm:block">
+          <span className="hidden flex-shrink-0 border-l border-gray-300 pl-5 text-lg font-bold xl:block">
             Seller Hub
           </span>
-          <nav className="ml-2 hidden min-w-0 flex-1 items-stretch gap-6 self-stretch xl:flex">
-            {tabs.map(([value, label, to]) =>
-              to ? (
-                <Link
-                  key={value}
-                  to={to}
-                  className={`flex items-center border-b-4 px-1 text-sm ${active === value ? "border-blue-600 font-bold text-blue-700" : "border-transparent hover:border-gray-300"}`}
-                >
-                  {label}
-                </Link>
-              ) : (
-                <span
-                  key={value}
-                  className="flex cursor-default items-center border-b-4 border-transparent px-1 text-sm text-gray-600"
-                >
-                  {label}
-                </span>
-              ),
-            )}
-          </nav>
           <Link
             to="/messages"
-            className="ml-auto hidden rounded-full border border-gray-400 px-5 py-2 text-sm font-semibold lg:block"
+            className="ml-auto hidden flex-shrink-0 rounded-full border border-gray-400 px-4 py-2 text-sm font-semibold lg:block"
           >
             Messages (0)
           </Link>
         </div>
 
-        <nav className="mx-auto flex max-w-screen-2xl overflow-x-auto border-t border-gray-200">
-          {tabs.slice(0, 5).map(([value, label, to]) =>
+        <nav className="mx-auto flex max-w-screen-2xl gap-1 overflow-x-auto border-t border-gray-200 scrollbar-thin">
+          {tabs.map(([value, label, to]) =>
             to ? (
               <Link
                 key={value}
                 to={to}
-                className={`whitespace-nowrap border-b-4 px-4 py-3 text-sm ${active === value ? "border-blue-600 font-bold text-blue-700" : "border-transparent"}`}
+                className={`whitespace-nowrap border-b-4 px-3 py-3 text-sm sm:px-4 ${active === value ? "border-blue-600 font-bold text-blue-700" : "border-transparent hover:border-gray-300"}`}
               >
                 {label}
               </Link>
             ) : (
               <span
                 key={value}
-                className="whitespace-nowrap border-b-4 border-transparent px-4 py-3 text-sm text-gray-500"
+                className="whitespace-nowrap border-b-4 border-transparent px-3 py-3 text-sm text-gray-500 sm:px-4"
               >
                 {label}
               </span>
