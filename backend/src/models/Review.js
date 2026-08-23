@@ -52,6 +52,10 @@ const reviewSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    sellerResponse: {
+      comment: { type: String, trim: true, maxlength: 500 },
+      respondedAt: { type: Date },
+    },
   },
   { timestamps: true },
 );

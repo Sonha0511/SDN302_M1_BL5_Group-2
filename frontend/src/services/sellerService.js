@@ -15,3 +15,6 @@ export const updateOrderStatus = (id, status) =>
   API.patch(`/seller/orders/${id}/status`, { status });
 export const confirmOrder = (id) => API.patch(`/seller/orders/${id}/confirm`);
 export const toggleListing = (id) => API.patch(`/seller/listings/${id}/toggle`);
+export const getMySellerReviews = () => API.get("/reviews/seller/me");
+export const respondToReview = (id, comment) =>
+  API.post(`/reviews/${id}/seller-response`, { comment });

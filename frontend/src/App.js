@@ -22,6 +22,7 @@ import SellStart from "./pages/SellStart";
 import SellerOrders from "./pages/SellerOrders";
 import SellerMarketing from "./pages/SellerMarketing";
 import SellerOverview from "./pages/SellerOverview";
+import SellerFeedback from "./pages/SellerFeedback";
 import SellerRegisterNotice from "./pages/seller/SellerRegisterNotice";
 import MyOrders from "./pages/orders/MyOrders";
 import OrderDetail from "./pages/orders/OrderDetail";
@@ -56,6 +57,7 @@ function App() {
           <Route path="/seller/listings/:id/edit" element={<SellerEditListing />} />
           <Route path="/seller/marketing" element={<SellerMarketing />} />
           <Route path="/seller/orders" element={<SellerOrders />} />
+          <Route path="/seller/feedback" element={<SellerFeedback />} />
           <Route path="/seller/:id" element={<SellerProfile />} />
           <Route path="*" element={<NotFound />} />
           <Route path="/disputes/create/:orderId" element={<CreateDispute />} />
