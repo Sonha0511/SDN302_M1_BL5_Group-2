@@ -5,6 +5,7 @@ const tabs = [
   ["overview", "Overview", "/seller/overview"],
   ["orders", "Orders", "/seller/orders"],
   ["listings", "Listings", "/seller/inventory"],
+  ["feedback", "Feedback", "/seller/feedback"],
   ["marketing", "Marketing", null],
   ["performance", "Performance", null],
   ["payments", "Payments", null],
