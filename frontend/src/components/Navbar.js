@@ -23,7 +23,7 @@ function Navbar({ hideCategories = false }) {
     }
   };
 
-  // Count the requests that still need attention, for the My eBay badge
+  // EFFECT MỚI: Tự động gọi API đếm số khiếu nại khi user đăng nhập
   useEffect(() => {
     if (user) {
       const fetchPendingDisputes = async () => {
@@ -35,12 +35,12 @@ function Navbar({ hideCategories = false }) {
           
           if (response.ok) {
             const data = await response.json();
-            // Only "OPEN" requests are waiting on someone to act
+            // Lọc ra những đơn hàng có trạng thái "OPEN" (Mới tạo/Chưa xử lý)
             const openCount = data.filter(d => d.status === "OPEN").length;
             setPendingDisputes(openCount);
           }
         } catch (error) {
-          console.error("Failed to count open requests:", error);
+          console.error("Lỗi đếm số lượng khiếu nại:", error);
         }
       };
       
@@ -48,7 +48,7 @@ function Navbar({ hideCategories = false }) {
     }
   }, [user]);
 
-  // `isDispute: true` tells the menu to render the pending-count badge
+  // Đã thêm cờ `isDispute: true` vào mục khiếu nại để render badge
   const myEbayItems = [
     { label: "Summary", to: null },
     { label: "Recently Viewed", to: null },
@@ -66,7 +66,7 @@ function Navbar({ hideCategories = false }) {
     { label: "My Collection", to: null },
     { label: "Messages", to: "/messages" },
     { label: "PSA Vault", to: null },
-    { label: "Returns and requests", to: "/disputes/my", isDispute: true },
+    { label: "My Disputes", to: "/disputes/my", isDispute: true },
   ];
 
   return (
@@ -164,7 +164,7 @@ function Navbar({ hideCategories = false }) {
                       {/* HIỂN THỊ BADGE BÊN TRONG DROPDOWN */}
                       {isDispute && pendingDisputes > 0 && (
                         <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
-                          {pendingDisputes} Mới
+                          {pendingDisputes} New
                         </span>
                       )}
                     </Link>
