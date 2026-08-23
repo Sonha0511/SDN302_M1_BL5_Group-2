@@ -126,14 +126,22 @@ exports.updateSellerProfile = async (req, res) => {
 
     seller.sellerProfile = {
       ...seller.sellerProfile,
-      storeName: normalized.storeName,
-      bio: normalized.bio,
-      phone: normalized.phone,
-      location: normalized.location,
-      businessType,
-      responseTime,
-      returnPolicy,
-      shippingFrom: normalized.shippingFrom,
+      storeName: normalized.storeName || seller.sellerProfile?.storeName || "",
+      bio: normalized.bio || seller.sellerProfile?.bio || "",
+      phone: normalized.phone || seller.sellerProfile?.phone || "",
+      location: normalized.location || seller.sellerProfile?.location || "",
+      businessType:
+        businessType?.trim() || seller.sellerProfile?.businessType || "Individual",
+      responseTime:
+        responseTime?.trim() ||
+        seller.sellerProfile?.responseTime ||
+        "Within 24 hours",
+      returnPolicy:
+        returnPolicy?.trim() ||
+        seller.sellerProfile?.returnPolicy ||
+        "30-day returns",
+      shippingFrom:
+        normalized.shippingFrom || seller.sellerProfile?.shippingFrom || "",
     };
 
     await seller.save();
