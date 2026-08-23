@@ -1,346 +1,251 @@
-import React, { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import Navbar from "../../components/Navbar";
-import API from "../../services/api";
-import {
-  REASON_LABELS,
-  createDispute,
-  formatDate,
-  formatPrice,
-} from "../../services/disputeService";
 
-// Reasons a buyer can pick, in the order eBay presents them
-const REASON_OPTIONS = [
-  "NOT_RECEIVED",
-  "NOT_AS_DESCRIBED",
-  "DAMAGED",
-  "WRONG_ITEM",
-  "MISSING_PARTS",
-  "FAKE_COUNTERFEIT",
-  "LATE_DELIVERY",
-  "REFUND_NOT_RECEIVED",
-  "OTHER",
-];
+// Hàm định dạng tiền tệ giống bên MyOrders
+const formatPrice = (price) =>
+  new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(price);
 
-const REASON_HINTS = {
-  NOT_RECEIVED: "The estimated delivery date has passed and nothing arrived.",
-  NOT_AS_DESCRIBED:
-    "The item is different from the listing photos or description.",
-  DAMAGED: "The item arrived broken, cracked, or otherwise damaged.",
-  WRONG_ITEM: "You received a different item than the one you ordered.",
-  MISSING_PARTS: "Parts or accessories listed in the description are missing.",
-  FAKE_COUNTERFEIT: "You believe the item is not authentic.",
-  LATE_DELIVERY: "The item arrived well after the estimated delivery date.",
-  REFUND_NOT_RECEIVED: "A refund was agreed but never reached your account.",
-  OTHER: "Something else went wrong with this order.",
-};
-
-const MAX_PHOTOS = 3;
-
-export default function CreateDispute() {
+const CreateDispute = () => {
   const { orderId } = useParams();
   const navigate = useNavigate();
 
   const [reason, setReason] = useState("NOT_AS_DESCRIBED");
   const [description, setDescription] = useState("");
   const [files, setFiles] = useState([]);
-  const [error, setError] = useState("");
-  const [progress, setProgress] = useState("");
+  const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [order, setOrder] = useState(null);
+  
+  // State mới để lưu thông tin chi tiết đơn hàng
+  const [orderDetail, setOrderDetail] = useState(null);
 
   useEffect(() => {
-    // Restore any draft the buyer left behind
-    const draft = localStorage.getItem(`draft_dispute_${orderId}`);
-    if (draft) setDescription(draft);
+    // 1. Lấy dữ liệu nháp (nếu có)
+    const draftText = localStorage.getItem(`draft_dispute_${orderId}`);
+    if (draftText) setDescription(draftText);
 
-    const fetchOrder = async () => {
+    // 2. Gọi API lấy thông tin đơn hàng để hiển thị bên phải
+    const fetchOrderDetails = async () => {
       try {
-        const response = await API.get(`/orders/${orderId}`);
-        setOrder(response.data?.data || response.data);
-      } catch (requestError) {
-        setError(
-          requestError.response?.data?.message ||
-            "We couldn't load this order.",
-        );
+        const token = localStorage.getItem("token");
+        const response = await fetch(`http://localhost:5000/api/orders/${orderId}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setOrderDetail(data);
+        }
+      } catch (error) {
+        console.error("Lỗi tải thông tin đơn hàng:", error);
       }
     };
 
-    fetchOrder();
+    fetchOrderDetails();
   }, [orderId]);
 
-  const handleDescriptionChange = (event) => {
-    const text = event.target.value;
+  const handleDescriptionChange = (e) => {
+    const text = e.target.value;
     setDescription(text);
     localStorage.setItem(`draft_dispute_${orderId}`, text);
   };
 
-  const handleFileChange = (event) => {
-    const selected = Array.from(event.target.files);
-    if (selected.length > MAX_PHOTOS) {
-      setError(`You can attach up to ${MAX_PHOTOS} photos.`);
+  const handleFileChange = (e) => {
+    const selectedFiles = Array.from(e.target.files);
+    if (selectedFiles.length > 3) {
+      alert("Bạn chỉ được tải lên tối đa 3 ảnh minh chứng.");
       return;
     }
-    setError("");
-    setFiles(selected);
+    setFiles(selectedFiles);
   };
 
-  const handleSubmit = async (event) => {
-    event.preventDefault();
-    if (description.trim().length < 20) {
-      setError(
-        "Please describe the problem in at least 20 characters so the seller can help.",
-      );
-      return;
-    }
-
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     setIsSubmitting(true);
-    setError("");
+    setMessage("Đang xử lý tải ảnh lên...");
+    
+    const token = localStorage.getItem("token");
     let uploadedImageUrls = [];
 
     try {
       if (files.length > 0) {
-        setProgress("Uploading photos...");
         const formData = new FormData();
-        files.forEach((file) => formData.append("images", file));
+        files.forEach(file => formData.append("images", file));
 
-        const uploadResponse = await API.post("/upload/images", formData, {
-          headers: { "Content-Type": "multipart/form-data" },
+        const uploadRes = await fetch("http://localhost:5000/api/upload/images", {
+          method: "POST",
+          headers: { "Authorization": `Bearer ${token}` },
+          body: formData
         });
 
-        const rawUrls = uploadResponse.data?.urls || [];
-        uploadedImageUrls = rawUrls.map((item) =>
-          typeof item === "string" ? item : item.url,
-        );
+        if (!uploadRes.ok) throw new Error("Lỗi tải ảnh lên");
+        
+        const uploadData = await uploadRes.json();
+        console.log("Kết quả từ API Upload:", uploadData);
+
+        const rawUrls = uploadData.urls || [];
+        uploadedImageUrls = rawUrls.map(item => typeof item === 'string' ? item : item.url);
       }
 
-      setProgress("Sending your request...");
-      await createDispute({
-        orderId,
-        reason,
-        description: description.trim(),
-        evidenceImages: uploadedImageUrls,
+      setMessage("Đang gửi khiếu nại...");
+      const response = await fetch("http://localhost:5000/api/disputes", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          orderId: orderId,
+          reason,
+          description,
+          evidenceImages: uploadedImageUrls
+        })
       });
 
-      localStorage.removeItem(`draft_dispute_${orderId}`);
-      navigate("/disputes/my");
-    } catch (requestError) {
-      setError(
-        requestError.response?.data?.message ||
-          requestError.message ||
-          "We couldn't send your request. Please try again.",
-      );
+      if (response.ok) {
+        localStorage.removeItem(`draft_dispute_${orderId}`);
+        alert("Gửi khiếu nại thành công!");
+        navigate("/disputes/my");
+      } else {
+        const errorData = await response.json();
+        setMessage(`Lỗi: ${errorData.message}`);
+      }
+    } catch (error) {
+      setMessage(`Lỗi: ${error.message || "Không thể kết nối đến server"}`);
     } finally {
-      setProgress("");
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#f7f7f7] text-gray-900">
+    <div className="min-h-screen bg-gray-50">
       <Navbar />
+      
+      {/* Container chính: Sử dụng Flexbox để chia 2 cột */}
+      <div style={{ maxWidth: "1000px", margin: "40px auto", padding: "0 20px", display: "flex", gap: "30px", flexWrap: "wrap", alignItems: "flex-start" }}>
+        
+        {/* ===================== CỘT TRÁI: FORM KHIẾU NẠI ===================== */}
+        <div style={{ flex: "1 1 500px", padding: "25px", backgroundColor: "#fff", border: "1px solid #ddd", borderRadius: "10px", boxShadow: "0 2px 4px rgba(0,0,0,0.05)" }}>
+          <h2 style={{ marginTop: 0, borderBottom: "1px solid #eee", paddingBottom: "10px" }}>Gửi Khiếu Nại Đơn Hàng</h2>
+          <p style={{ color: "#666", fontSize: "14px", marginBottom: "20px" }}>Mã đơn: <strong style={{ fontFamily: "monospace" }}>{orderId}</strong></p>
 
-      <main className="mx-auto max-w-screen-lg px-6 py-8">
-        <nav className="mb-5 text-xs text-gray-600">
-          <Link to="/my-orders" className="hover:underline">
-            Purchase history
-          </Link>
-          <span className="mx-2">&rsaquo;</span>
-          <span className="font-semibold text-gray-900">
-            Tell us what went wrong
-          </span>
-        </nav>
+          {message && <div style={{ marginBottom: "15px", padding: "10px", borderRadius: "4px", backgroundColor: message.includes("Lỗi") ? "#f8d7da" : "#cce5ff", color: message.includes("Lỗi") ? "#721c24" : "#004085", fontWeight: "bold" }}>{message}</div>}
 
-        <h1 className="text-3xl font-bold">Tell us what went wrong</h1>
-        <p className="mt-2 max-w-2xl text-sm text-gray-600">
-          The seller has 3 business days to respond. If you can't work it out
-          together, you can ask eBay to step in and help.
-        </p>
-
-        <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_340px]">
-          {/* -------------------- Request form -------------------- */}
-          <form
-            onSubmit={handleSubmit}
-            className="rounded-xl border border-gray-300 bg-white p-6"
-          >
-            {error && (
-              <p className="mb-5 rounded-lg border-l-4 border-red-600 bg-red-50 p-4 text-sm text-red-700">
-                {error}
-              </p>
-            )}
-
-            <fieldset>
-              <legend className="text-lg font-bold">
-                Why are you opening this request?
-              </legend>
-              <div className="mt-4 space-y-2">
-                {REASON_OPTIONS.map((value) => (
-                  <label
-                    key={value}
-                    className={`flex cursor-pointer gap-3 rounded-lg border p-4 ${
-                      reason === value
-                        ? "border-blue-600 bg-blue-50"
-                        : "border-gray-300 hover:border-gray-500"
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="reason"
-                      value={value}
-                      checked={reason === value}
-                      onChange={(event) => setReason(event.target.value)}
-                      className="mt-1 h-4 w-4 flex-shrink-0 accent-blue-600"
-                    />
-                    <span>
-                      <span className="block text-sm font-semibold">
-                        {REASON_LABELS[value]}
-                      </span>
-                      <span className="block text-xs text-gray-500">
-                        {REASON_HINTS[value]}
-                      </span>
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-
-            <hr className="my-6 border-gray-200" />
-
-            <label className="block text-lg font-bold" htmlFor="description">
-              Describe the problem
-            </label>
-            <p className="mt-1 text-sm text-gray-600">
-              Include details like what you expected, what you received, and
-              what you'd like the seller to do.
-            </p>
-            <textarea
-              id="description"
-              rows="6"
-              value={description}
-              onChange={handleDescriptionChange}
-              required
-              placeholder="For example: The listing said the item was unused, but the box was already open and the screen has scratches. I'd like a refund."
-              className="mt-3 w-full rounded-lg border border-gray-400 p-3 text-sm outline-none focus:border-blue-600"
-            />
-            <p className="mt-1 text-xs text-gray-500">
-              {description.length} characters &middot; your draft is saved
-              automatically
-            </p>
-
-            <hr className="my-6 border-gray-200" />
-
-            <p className="text-lg font-bold">Add photos (optional)</p>
-            <p className="mt-1 text-sm text-gray-600">
-              Photos help the seller understand the problem. Up to{" "}
-              {MAX_PHOTOS} images.
-            </p>
-            <input
-              type="file"
-              multiple
-              accept="image/*"
-              onChange={handleFileChange}
-              className="mt-3 w-full rounded-lg border border-dashed border-gray-400 bg-gray-50 p-4 text-sm"
-            />
-            {files.length > 0 && (
-              <div className="mt-4 flex flex-wrap gap-3">
-                {files.map((file, index) => (
-                  <img
-                    key={index}
-                    src={URL.createObjectURL(file)}
-                    alt={`Attachment ${index + 1}`}
-                    className="h-20 w-20 rounded-lg border border-gray-300 object-cover"
-                  />
-                ))}
-              </div>
-            )}
-
-            <div className="mt-8 flex flex-wrap items-center gap-4">
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="rounded-full bg-blue-600 px-8 py-3 text-sm font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+          <form onSubmit={handleSubmit}>
+            <div style={{ marginBottom: "15px" }}>
+              <label style={{ display: "block", marginBottom: "5px", fontWeight: "bold", fontSize: "14px" }}>Lý do khiếu nại:</label>
+              <select 
+                value={reason} 
+                onChange={(e) => setReason(e.target.value)}
+                style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #ccc", outline: "none" }}
               >
-                {isSubmitting ? progress || "Sending..." : "Send request"}
-              </button>
-              <Link
-                to="/my-orders"
-                className="rounded-full border border-gray-600 px-8 py-3 text-sm font-semibold hover:bg-gray-50"
-              >
-                Cancel
-              </Link>
+                <option value="NOT_AS_DESCRIBED">Không đúng mô tả</option>
+                <option value="NOT_RECEIVED">Chưa nhận được hàng</option>
+                <option value="DAMAGED">Hàng bị hư hỏng</option>
+                <option value="MISSING_PARTS">Thiếu phụ kiện</option>
+                <option value="OTHER">Lý do khác</option>
+              </select>
             </div>
-          </form>
+            
+            <div style={{ marginBottom: "15px" }}>
+              <label style={{ display: "block", marginBottom: "5px", fontWeight: "bold", fontSize: "14px" }}>Mô tả chi tiết:</label>
+              <textarea
+                rows="5"
+                placeholder="Mô tả chi tiết vấn đề của bạn..."
+                value={description}
+                onChange={handleDescriptionChange}
+                required
+                style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #ccc", outline: "none", boxSizing: "border-box" }}
+              />
+            </div>
 
-          {/* -------------------- Order summary -------------------- */}
-          <aside className="space-y-6">
-            <section className="rounded-xl border border-gray-300 bg-white p-6">
-              <h2 className="mb-4 text-lg font-bold">Order summary</h2>
-              {!order ? (
-                <div className="h-48 animate-pulse rounded-lg bg-gray-100" />
-              ) : (
-                <>
-                  <div className="mb-4 h-40 overflow-hidden rounded-lg bg-gray-100">
-                    {order.listingImage ? (
-                      <img
-                        src={order.listingImage}
-                        alt={order.listingTitle}
-                        className="h-full w-full object-contain p-3"
+            <div style={{ marginBottom: "20px", padding: "15px", backgroundColor: "#f8f9fa", border: "1px dashed #ced4da", borderRadius: "8px" }}>
+              <label style={{ display: "block", marginBottom: "8px", fontWeight: "bold", fontSize: "14px" }}>Ảnh minh chứng (Tối đa 3 ảnh):</label>
+              <input 
+                type="file" 
+                multiple 
+                accept="image/*"
+                onChange={handleFileChange}
+                style={{ width: "100%", fontSize: "14px" }}
+              />
+              
+              {files.length > 0 && (
+                <div style={{ display: "flex", gap: "10px", marginTop: "15px", flexWrap: "wrap" }}>
+                  {files.map((file, idx) => (
+                    <div key={idx} style={{ position: "relative" }}>
+                      <img 
+                        src={URL.createObjectURL(file)} 
+                        alt={`preview-${idx}`} 
+                        style={{ width: "80px", height: "80px", objectFit: "cover", borderRadius: "6px", border: "1px solid #ddd" }}
                       />
-                    ) : (
-                      <div className="flex h-full items-center justify-center text-sm text-gray-400">
-                        No image
-                      </div>
-                    )}
-                  </div>
-                  <p className="font-semibold leading-6">
-                    {order.listingTitle}
-                  </p>
-                  <dl className="mt-4 space-y-2 text-sm">
-                    <Row label="Order number">
-                      #{orderId.slice(-12).toUpperCase()}
-                    </Row>
-                    <Row label="Order date">{formatDate(order.createdAt)}</Row>
-                    <Row label="Quantity">{order.quantity || 1}</Row>
-                    <Row label="Seller">
-                      {order.sellerId?.username || "Seller"}
-                    </Row>
-                    <Row label="Payment">{order.paymentMethod || "COD"}</Row>
-                  </dl>
-                  <div className="mt-4 flex items-center justify-between border-t border-gray-200 pt-4">
-                    <span className="font-bold">Order total</span>
-                    <span className="text-lg font-bold">
-                      {formatPrice(order.pricing?.total)}
-                    </span>
-                  </div>
-                </>
+                    </div>
+                  ))}
+                </div>
               )}
-            </section>
-
-            <section className="rounded-xl border border-gray-300 bg-white p-6">
-              <h2 className="mb-3 text-lg font-bold">What happens next</h2>
-              <ol className="list-decimal space-y-2 pl-5 text-sm leading-6 text-gray-600">
-                <li>The seller is notified and has 3 business days to reply.</li>
-                <li>
-                  Most sellers resolve requests with a refund or a replacement.
-                </li>
-                <li>
-                  If you're not satisfied, you can ask eBay to step in and
-                  review the case.
-                </li>
-              </ol>
-            </section>
-          </aside>
+            </div>
+            
+            <button 
+              type="submit" 
+              disabled={isSubmitting}
+              style={{ padding: "12px 20px", backgroundColor: isSubmitting ? "#ccc" : "#d9534f", color: "white", border: "none", borderRadius: "6px", cursor: isSubmitting ? "not-allowed" : "pointer", fontWeight: "bold", width: "100%", fontSize: "15px", transition: "0.2s" }}
+            >
+              {isSubmitting ? "Đang xử lý..." : "Xác nhận & Gửi khiếu nại"}
+            </button>
+          </form>
         </div>
-      </main>
-    </div>
-  );
-}
 
-function Row({ label, children }) {
-  return (
-    <div className="flex items-start justify-between gap-4">
-      <dt className="text-gray-500">{label}</dt>
-      <dd className="text-right font-semibold">{children}</dd>
+        {/* ===================== CỘT PHẢI: THÔNG TIN SẢN PHẨM ===================== */}
+        <div style={{ flex: "1 1 350px", maxWidth: "400px", padding: "20px", backgroundColor: "#fff", border: "1px solid #ddd", borderRadius: "10px", boxShadow: "0 2px 4px rgba(0,0,0,0.05)" }}>
+          <h3 style={{ marginTop: 0, borderBottom: "1px solid #eee", paddingBottom: "10px", fontSize: "18px" }}>Thông tin đơn hàng</h3>
+          
+          {!orderDetail ? (
+            <div style={{ padding: "20px 0", color: "#666", textAlign: "center" }}>Đang tải thông tin sản phẩm...</div>
+          ) : (
+            <div style={{ marginTop: "15px" }}>
+              {/* Ảnh sản phẩm */}
+              <div style={{ width: "100%", height: "200px", backgroundColor: "#f8f9fa", borderRadius: "8px", overflow: "hidden", marginBottom: "15px", border: "1px solid #eee", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                {orderDetail.listingImage ? (
+                  <img 
+                    src={orderDetail.listingImage} 
+                    alt={orderDetail.listingTitle} 
+                    style={{ width: "100%", height: "100%", objectFit: "contain" }} 
+                  />
+                ) : (
+                  <span style={{ color: "#aaa", fontSize: "14px" }}>Không có ảnh</span>
+                )}
+              </div>
+              
+              {/* Chi tiết sản phẩm */}
+              <h4 style={{ margin: "0 0 10px 0", color: "#333", lineHeight: "1.4" }}>
+                {orderDetail.listingTitle || "Tên sản phẩm không xác định"}
+              </h4>
+              
+              <div style={{ fontSize: "14px", color: "#555", lineHeight: "1.8" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px dashed #eee", paddingBottom: "5px", marginBottom: "5px" }}>
+                  <span>Phân loại/Option:</span> 
+                  <strong>{orderDetail.paymentMethod || "Mặc định"}</strong>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px dashed #eee", paddingBottom: "5px", marginBottom: "5px" }}>
+                  <span>Số lượng:</span> 
+                  <strong>x{orderDetail.quantity || 1}</strong>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px dashed #eee", paddingBottom: "5px", marginBottom: "5px" }}>
+                  <span>Shop bán:</span> 
+                  <strong>{orderDetail.sellerId?.username || "Ẩn danh"}</strong>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: "10px", paddingTop: "10px" }}>
+                  <span style={{ fontWeight: "bold", color: "#333" }}>Tổng thanh toán:</span> 
+                  <strong style={{ color: "#d9534f", fontSize: "18px" }}>
+                    {orderDetail.pricing?.total ? formatPrice(orderDetail.pricing.total) : "N/A"}
+                  </strong>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+      </div>
     </div>
   );
-}
+};
+
+export default CreateDispute;

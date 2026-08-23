@@ -52,7 +52,7 @@ function SellerListings() {
   useEffect(() => {
     if (authLoading) return;
     if (!user) navigate("/login");
-    else if (user.role !== "seller") navigate("/sell/start");
+    else if (user.role !== "seller") navigate("/seller/register-notice");
   }, [authLoading, navigate, user]);
 
   const matches = useMemo(() => [

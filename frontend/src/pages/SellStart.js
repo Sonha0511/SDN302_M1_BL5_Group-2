@@ -19,7 +19,7 @@ function SellStart() {
     event.preventDefault();
     if (!query.trim()) { setError("Tell us what you're selling to continue."); return; }
     if (!user) { navigate("/login"); return; }
-    if (user.role !== "seller") { navigate("/register"); return; }
+    if (user.role !== "seller") { navigate("/seller/register-notice"); return; }
     navigate("/seller/listings", { state: { createListing: true, suggestedTitle: query.trim() } });
   };
 

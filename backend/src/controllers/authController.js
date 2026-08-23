@@ -14,7 +14,7 @@ exports.register = async (req, res) => {
     if (existingUser) {
       return res
         .status(400)
-        .json({ message: "Email hoặc username đã tồn tại" });
+        .json({ message: "Email or username already exists" });
     }
 
     const user = await User.create({ email, password, name, username, role });
@@ -32,7 +32,7 @@ exports.register = async (req, res) => {
       },
     });
   } catch (error) {
-    console.log("LỖI REGISTER:", error); // thêm dòng này
+    console.log("REGISTER ERROR:", error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -46,14 +46,14 @@ exports.login = async (req, res) => {
     if (!user) {
       return res
         .status(401)
-        .json({ message: "Email hoặc mật khẩu không đúng" });
+        .json({ message: "Invalid email or password" });
     }
 
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
       return res
         .status(401)
-        .json({ message: "Email hoặc mật khẩu không đúng" });
+        .json({ message: "Invalid email or password" });
     }
 
     const token = generateToken(user._id);
@@ -81,5 +81,50 @@ exports.getMe = async (req, res) => {
     res.json(user);
   } catch (error) {
     res.status(500).json({ message: error.message });
+  }
+};
+
+// POST /api/auth/become-seller
+exports.becomeSeller = async (req, res) => {
+  try {
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    user.role = "seller";
+    if (!user.sellerProfile || !user.sellerProfile.storeName) {
+      user.sellerProfile = {
+        ...user.sellerProfile,
+        storeName: req.body.storeName?.trim() || `${user.name}'s Store`,
+        bio: req.body.bio?.trim() || "Welcome to my store on eBay!",
+        phone: req.body.phone?.trim() || "",
+        location: req.body.location?.trim() || "Vietnam",
+        businessType: req.body.businessType || "Individual",
+        responseTime: "Within 24 hours",
+        returnPolicy: "30-day returns",
+        shippingFrom: req.body.shippingFrom?.trim() || "Vietnam",
+      };
+    }
+
+    await user.save();
+    const token = generateToken(user._id);
+
+    return res.json({
+      success: true,
+      message: "Congratulations! You have successfully registered your eBay Seller account.",
+      token,
+      user: {
+        _id: user._id,
+        email: user.email,
+        name: user.name,
+        username: user.username,
+        role: user.role,
+        avatar: user.avatar,
+        sellerProfile: user.sellerProfile,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
   }
 };
