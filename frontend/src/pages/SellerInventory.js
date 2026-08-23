@@ -21,7 +21,7 @@ function SellerInventory() {
   useEffect(() => {
     if (authLoading) return;
     if (!user) { navigate("/login"); return; }
-    if (user.role !== "seller") { navigate("/sell"); return; }
+    if (user.role !== "seller") { navigate("/seller/register-notice"); return; }
     loadListings();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, user]);
