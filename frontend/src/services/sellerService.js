@@ -5,6 +5,8 @@ export const createListing = (formData) =>
   API.post("/seller/listings", formData, {
     headers: { "Content-Type": "multipart/form-data" },
   });
+export const findListingMatches = (search) =>
+  API.get("/listings", { params: { search, limit: 6, page: 1 } });
 export const updateListing = (id, formData) =>
   API.put(`/seller/listings/${id}`, formData, {
     headers: { "Content-Type": "multipart/form-data" },

@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const auth = require("../middleware/auth");
+const { createLimiter } = require("../middleware/rateLimiter");
 const {
   createReview,
   getListingReviews,
@@ -10,11 +11,11 @@ const {
   respondToReview,
 } = require("../controllers/reviewController");
 
-router.post("/", auth, createReview);
+router.post("/", auth, createLimiter, createReview);
 router.get("/listing/:listingId", getListingReviews);
 router.get("/seller/:sellerId/summary", getSellerReviewSummary);
 router.get("/seller/me", auth, getMySellerReviews);
 router.get("/order/:orderId", auth, getOrderReview);
-router.post("/:reviewId/seller-response", auth, respondToReview);
+router.post("/:reviewId/seller-response", auth, createLimiter, respondToReview);
 
 module.exports = router;

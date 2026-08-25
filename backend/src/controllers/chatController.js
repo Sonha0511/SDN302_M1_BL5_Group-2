@@ -1,5 +1,6 @@
 const Conversation = require("../models/Conversation");
 const Message = require("../models/Message");
+const User = require("../models/User");
 const logMessageDebug = require("../utils/messageDebugLogger");
 
 // GET /api/chat/conversations - lấy tất cả conversations của user
@@ -16,6 +17,18 @@ exports.getConversations = async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
+};
+
+// Search active members before composing a new eBay-style message.
+exports.searchMembers = async (req, res) => {
+  try {
+    const query = String(req.query.q || "").trim();
+    if (query.length < 2) return res.json([]);
+    const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const members = await User.find({ _id: { $ne: req.userId }, isActive: true, $or: [{ username: { $regex: escaped, $options: "i" } }, { name: { $regex: escaped, $options: "i" } }] })
+      .select("name username avatar role sellerProfile.storeName").limit(10);
+    res.json(members);
+  } catch (error) { res.status(500).json({ message: error.message }); }
 };
 
 // GET /api/chat/conversations/:id/messages - lấy messages của 1 conversation

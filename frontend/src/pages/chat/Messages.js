@@ -41,6 +41,10 @@ function Messages() {
   const [msgLoading, setMsgLoading] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [activeFilter, setActiveFilter] = useState("Inbox");
+  const [composeOpen, setComposeOpen] = useState(false);
+  const [memberQuery, setMemberQuery] = useState("");
+  const [memberResults, setMemberResults] = useState([]);
+  const [searchingMembers, setSearchingMembers] = useState(false);
   const messagesEndRef = useRef(null);
   const socketRef = useRef(null);
   const typingTimeout = useRef(null);
@@ -148,6 +152,25 @@ function Messages() {
     }, 1500);
   };
 
+  useEffect(() => {
+    if (memberQuery.trim().length < 2) { setMemberResults([]); return; }
+    const timer = setTimeout(async () => {
+      setSearchingMembers(true);
+      try { const response = await api.get("/chat/members", { params: { q: memberQuery } }); setMemberResults(response.data); }
+      finally { setSearchingMembers(false); }
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [memberQuery]);
+
+  const startConversation = async (member) => {
+    try {
+      const response = await api.post("/chat/conversations", { receiverId: member._id });
+      setComposeOpen(false); setMemberQuery("");
+      setConversations((current) => current.some((item) => item._id === response.data._id) ? current : [response.data, ...current]);
+      await selectConversation(response.data);
+    } catch (error) { console.error(error); }
+  };
+
   const getOtherParticipant = (conv) =>
     conv.participants?.find((p) => p._id !== user?._id);
 
@@ -195,6 +218,7 @@ function Messages() {
               <h1 className="text-base font-semibold text-gray-800">
                 Messages
               </h1>
+              <button onClick={() => setComposeOpen(true)} className="ml-auto rounded-full bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700">Compose</button>
             </div>
 
             {/* Nav items */}
@@ -228,9 +252,10 @@ function Messages() {
                 <button className="text-sm text-blue-600 hover:underline">
                   Create folder
                 </button>
-              </div>
-            </div>
-          </div>
+        </div>
+      </div>
+      {composeOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"><div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl"><div className="flex items-center justify-between border-b px-6 py-4"><div><h2 className="text-xl font-bold">New message</h2><p className="mt-1 text-sm text-gray-500">Search an eBay member by name or username.</p></div><button onClick={() => setComposeOpen(false)} className="text-2xl text-gray-500">×</button></div><div className="p-6"><input autoFocus value={memberQuery} onChange={(e) => setMemberQuery(e.target.value)} placeholder="Search members" className="w-full rounded-lg border border-gray-400 px-4 py-3 outline-none focus:border-blue-600" />{searchingMembers && <p className="mt-4 text-sm text-gray-500">Searching members…</p>}{memberQuery.length >= 2 && !searchingMembers && <div className="mt-4 divide-y rounded-xl border">{memberResults.length ? memberResults.map((member) => <button key={member._id} onClick={() => startConversation(member)} className="flex w-full items-center gap-3 p-4 text-left hover:bg-gray-50"><span className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 font-bold text-blue-700">{(member.username || member.name).charAt(0).toUpperCase()}</span><span><strong className="block">{member.sellerProfile?.storeName || member.name || member.username}</strong><small className="text-gray-500">@{member.username} · {member.role}</small></span></button>) : <p className="p-5 text-sm text-gray-500">No member found.</p>}</div>}</div></div></div>}
+    </div>
 
           {/* ── Col 2: Conversation list (2.5x) — cách col 1 8px ── */}
           <div

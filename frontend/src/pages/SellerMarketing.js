@@ -30,6 +30,12 @@ export default function SellerMarketing() {
   const [maxDiscountAmount, setMaxDiscountAmount] = useState("");
   const [usageLimit, setUsageLimit] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
+  const [eligibleScope, setEligibleScope] = useState("selected");
+  const [visibility, setVisibility] = useState("public");
+  const [campaignName, setCampaignName] = useState("");
+  const [maxUsesPerBuyer, setMaxUsesPerBuyer] = useState("");
+  const [campaignBudget, setCampaignBudget] = useState("");
 
   // UI States
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -79,7 +85,7 @@ export default function SellerMarketing() {
     setError("");
     setSuccess("");
 
-    if (!code.trim() || !selectedListingId || !discountValue || !endDate) {
+    if (!code.trim() || (eligibleScope === "selected" && !selectedListingId) || !discountValue || !endDate) {
       setError("Please fill in all required fields (Voucher Code, Target Product, Discount Value, End Date).");
       return;
     }
@@ -89,12 +95,18 @@ export default function SellerMarketing() {
       const payload = {
         code: code.toUpperCase().trim(),
         listingId: selectedListingId,
+        eligibleScope,
+        visibility,
+        campaignName,
+        maxUsesPerBuyer: maxUsesPerBuyer ? Number(maxUsesPerBuyer) : null,
+        campaignBudget: Number(campaignBudget) || 0,
         discountType,
         discountValue: Number(discountValue),
         minOrderValue: Number(minOrderValue) || 0,
         maxDiscountAmount: Number(maxDiscountAmount) || 0,
         usageLimit: usageLimit ? Number(usageLimit) : null,
-        endDate: new Date(endDate).toISOString(),
+        startDate: new Date(startDate).toISOString(),
+        endDate: new Date(`${endDate}T23:59:59`).toISOString(),
       };
 
       const res = await api.post("/vouchers", payload);
@@ -368,6 +380,14 @@ export default function SellerMarketing() {
                       </div>
 
                       <div>
+                        <label className="block text-xs font-semibold text-gray-700 uppercase mb-1">Campaign name</label>
+                        <input value={campaignName} onChange={e => setCampaignName(e.target.value)} maxLength={100} placeholder="e.g., September Sale 2026" className="w-full rounded-lg border border-gray-400 px-3 py-2 text-sm outline-none focus:border-blue-600" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-700 uppercase mb-1">Eligible products</label>
+                        <select value={eligibleScope} onChange={e => setEligibleScope(e.target.value)} className="w-full rounded-lg border border-gray-400 px-3 py-2 text-sm outline-none focus:border-blue-600 bg-white"><option value="selected">Selected product</option><option value="all">All my active products</option></select>
+                      </div>
+                      {eligibleScope === "selected" && <div>
                         <label className="block text-xs font-semibold text-gray-700 uppercase mb-1">Target Product *</label>
                         <select
                           value={selectedListingId}
@@ -382,6 +402,10 @@ export default function SellerMarketing() {
                             </option>
                           ))}
                         </select>
+                      </div>}
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-700 uppercase mb-1">Coupon visibility</label>
+                        <select value={visibility} onChange={e => setVisibility(e.target.value)} className="w-full rounded-lg border border-gray-400 px-3 py-2 text-sm outline-none focus:border-blue-600 bg-white"><option value="public">Public — show on listing</option><option value="private">Private — share code yourself</option></select>
                       </div>
 
                       <div>
@@ -445,6 +469,21 @@ export default function SellerMarketing() {
                           onChange={e => setUsageLimit(e.target.value)}
                           className="w-full rounded-lg border border-gray-400 px-3 py-2 text-sm outline-none focus:border-blue-600"
                         />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-700 uppercase mb-1">Maximum uses per buyer (optional)</label>
+                        <input type="number" min="1" placeholder="Unlimited if empty" value={maxUsesPerBuyer} onChange={e => setMaxUsesPerBuyer(e.target.value)} className="w-full rounded-lg border border-gray-400 px-3 py-2 text-sm outline-none focus:border-blue-600" />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-700 uppercase mb-1">Campaign budget (VND, optional)</label>
+                        <input type="number" min="0" placeholder="No budget cap if empty" value={campaignBudget} onChange={e => setCampaignBudget(e.target.value)} className="w-full rounded-lg border border-gray-400 px-3 py-2 text-sm outline-none focus:border-blue-600" />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-700 uppercase mb-1">Start Date *</label>
+                        <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} min={new Date().toISOString().split("T")[0]} className="w-full rounded-lg border border-gray-400 px-3 py-2 text-sm outline-none focus:border-blue-600" required />
                       </div>
 
                       <div>

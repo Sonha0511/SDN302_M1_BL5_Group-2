@@ -17,8 +17,16 @@ const voucherSchema = new mongoose.Schema(
     listingId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Listing",
-      required: true,
+      required: false,
     },
+    eligibleScope: { type: String, enum: ["all", "selected"], default: "selected" },
+    eligibleListingIds: [{ type: mongoose.Schema.Types.ObjectId, ref: "Listing" }],
+    visibility: { type: String, enum: ["public", "private"], default: "public" },
+    campaignName: { type: String, trim: true, maxlength: 100 },
+    description: { type: String, trim: true, maxlength: 300 },
+    maxUsesPerBuyer: { type: Number, default: null },
+    campaignBudget: { type: Number, default: 0 },
+    discountGiven: { type: Number, default: 0 },
     discountType: {
       type: String,
       enum: ["percentage", "fixed"],

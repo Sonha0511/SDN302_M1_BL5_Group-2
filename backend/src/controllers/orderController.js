@@ -1,6 +1,7 @@
 const Order = require("../models/Order");
 const Listing = require("../models/Listing");
 const Voucher = require("../models/Voucher");
+const VoucherRedemption = require("../models/VoucherRedemption");
 
 // POST /api/orders - tạo đơn hàng
 exports.createOrder = async (req, res) => {
@@ -42,6 +43,13 @@ exports.createOrder = async (req, res) => {
       if (voucher.usageLimit !== null && voucher.usedCount >= voucher.usageLimit) {
         return res.status(400).json({ message: "Mã giảm giá đã hết lượt sử dụng" });
       }
+      if (voucher.eligibleScope === "all" ? String(voucher.sellerId) !== String(listing.sellerId) : voucher.eligibleListingIds?.length && !voucher.eligibleListingIds.some((id) => String(id) === String(listingId))) {
+        return res.status(400).json({ message: "Voucher does not apply to this product." });
+      }
+      if (voucher.maxUsesPerBuyer) {
+        const buyerUses = await VoucherRedemption.countDocuments({ voucherId: voucher._id, buyerId: req.userId });
+        if (buyerUses >= voucher.maxUsesPerBuyer) return res.status(400).json({ message: "You have reached the use limit for this voucher." });
+      }
       if (subtotal < voucher.minOrderValue) {
         return res.status(400).json({ 
           message: `Mã giảm giá yêu cầu giá trị đơn hàng tối thiểu ₫${voucher.minOrderValue.toLocaleString("vi-VN")}` 
@@ -60,11 +68,15 @@ exports.createOrder = async (req, res) => {
       if (discountAmount > subtotal) {
         discountAmount = subtotal;
       }
+      if (voucher.campaignBudget > 0 && voucher.discountGiven + discountAmount > voucher.campaignBudget) {
+        return res.status(400).json({ message: "This coupon campaign has reached its budget." });
+      }
 
       appliedVoucherId = voucher._id;
 
       // Cập nhật số lượng đã sử dụng
       voucher.usedCount += 1;
+      voucher.discountGiven += discountAmount;
       await voucher.save();
     }
 
@@ -92,6 +104,8 @@ exports.createOrder = async (req, res) => {
       appliedVoucher: appliedVoucherId,
       discountAmount,
     });
+
+    if (appliedVoucherId) await VoucherRedemption.create({ voucherId: appliedVoucherId, buyerId: req.userId, orderId: order._id, discountAmount });
 
     listing.totalQuantity -= quantity;
     await listing.save();

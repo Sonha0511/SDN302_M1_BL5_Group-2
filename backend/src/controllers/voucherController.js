@@ -4,29 +4,43 @@ const Listing = require("../models/Listing");
 // 1. Seller tạo mã giảm giá cho sản phẩm của mình
 exports.createVoucher = async (req, res) => {
   try {
-    const { code, listingId, discountType, discountValue, minOrderValue, maxDiscountAmount, usageLimit, startDate, endDate } = req.body;
+    const { code, listingId, eligibleScope = "selected", eligibleListingIds = [], visibility = "public", campaignName, description, maxUsesPerBuyer, campaignBudget, discountType, discountValue, minOrderValue, maxDiscountAmount, usageLimit, startDate, endDate } = req.body;
     const userId = req.user?.id || req.user?._id || req.userId;
 
-    if (!code || !listingId || !discountType || !discountValue || !endDate) {
+    if (!code || !discountType || !discountValue || !endDate || (eligibleScope === "selected" && !listingId && !eligibleListingIds.length)) {
       return res.status(400).json({ success: false, message: "Missing required fields." });
     }
 
     // Kiểm tra sản phẩm có tồn tại và thuộc về seller này không
-    const listing = await Listing.findOne({ _id: listingId, sellerId: userId });
-    if (!listing) {
+    const selectedIds = eligibleListingIds.length ? eligibleListingIds : (listingId ? [listingId] : []);
+    const ownedCount = selectedIds.length ? await Listing.countDocuments({ _id: { $in: selectedIds }, sellerId: userId }) : 0;
+    if ((eligibleScope === "selected" && ownedCount !== selectedIds.length) || (eligibleScope === "all" && !await Listing.exists({ sellerId: userId }))) {
       return res.status(404).json({ success: false, message: "Product not found or you do not have permission to create voucher for it." });
     }
 
     // Kiểm tra code trùng lặp toàn hệ thống
-    const existingVoucher = await Voucher.findOne({ code: code.toUpperCase() });
+    const normalizedCode = code.trim().toUpperCase();
+    const startsAt = new Date(startDate || Date.now());
+    const endsAt = new Date(endDate);
+    if (!/^[A-Z0-9_-]{3,20}$/.test(normalizedCode) || !["percentage", "fixed"].includes(discountType) || Number(discountValue) <= 0 || (discountType === "percentage" && Number(discountValue) > 100) || startsAt >= endsAt || (usageLimit && Number(usageLimit) < 1) || (maxUsesPerBuyer && Number(maxUsesPerBuyer) < 1) || Number(campaignBudget || 0) < 0) {
+      return res.status(400).json({ success: false, message: "Please check coupon code, discount, limits, budget and campaign dates." });
+    }
+    const existingVoucher = await Voucher.findOne({ code: normalizedCode });
     if (existingVoucher) {
       return res.status(400).json({ success: false, message: "Voucher code already exists. Please choose a different code." });
     }
 
     const newVoucher = new Voucher({
-      code: code.toUpperCase(),
+      code: normalizedCode,
       sellerId: userId,
-      listingId,
+      listingId: selectedIds[0],
+      eligibleScope,
+      eligibleListingIds: selectedIds,
+      visibility,
+      campaignName,
+      description,
+      maxUsesPerBuyer: maxUsesPerBuyer ? Number(maxUsesPerBuyer) : null,
+      campaignBudget: Number(campaignBudget) || 0,
       discountType,
       discountValue: Number(discountValue),
       minOrderValue: Number(minOrderValue) || 0,
@@ -105,14 +119,16 @@ exports.getListingVouchers = async (req, res) => {
     const now = new Date();
     
     // Tìm các voucher còn hạn, chưa dùng hết lượt và đang hoạt động cho sản phẩm này
+    const listing = await Listing.findById(listingId).select("sellerId");
+    if (!listing) return res.status(404).json({ success: false, message: "Listing not found." });
     const vouchers = await Voucher.find({
-      listingId,
+      visibility: "public",
       isActive: true,
       startDate: { $lte: now },
       endDate: { $gte: now },
-      $or: [
-        { usageLimit: null },
-        { $expr: { $lt: ["$usedCount", "$usageLimit"] } }
+      $and: [
+        { $or: [{ usageLimit: null }, { $expr: { $lt: ["$usedCount", "$usageLimit"] } }] },
+        { $or: [{ eligibleScope: "all", sellerId: listing.sellerId }, { eligibleScope: "selected", eligibleListingIds: listingId }, { eligibleScope: "selected", listingId }] }
       ]
     }).select("code discountType discountValue minOrderValue maxDiscountAmount endDate");
 
@@ -136,7 +152,9 @@ exports.validateVoucher = async (req, res) => {
       return res.status(404).json({ success: false, message: "Voucher code is invalid or has expired." });
     }
 
-    if (String(voucher.listingId) !== String(listingId)) {
+    const listing = await Listing.findById(listingId).select("sellerId");
+    const eligible = voucher.eligibleScope === "all" ? String(voucher.sellerId) === String(listing?.sellerId) : voucher.eligibleListingIds?.some((id) => String(id) === String(listingId)) || String(voucher.listingId) === String(listingId);
+    if (!eligible) {
       return res.status(400).json({ success: false, message: "Voucher code cannot be applied to this product." });
     }
 

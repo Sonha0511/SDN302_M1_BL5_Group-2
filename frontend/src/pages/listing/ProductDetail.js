@@ -19,6 +19,11 @@ const conditionLabel = {
   acceptable: "Acceptable",
 };
 
+const specificLabel = (key) => ({
+  brand: "Brand", model: "Model", size: "Size", color: "Color", department: "Department",
+  storageCapacity: "Storage capacity", network: "Network", ram: "RAM", screenSize: "Screen size",
+}[key] || key.replace(/([A-Z])/g, " $1").replace(/^./, (letter) => letter.toUpperCase()));
+
 function RatingSummary({ title, reviews, averageRating, reviewCount, onWriteReview }) {
   const distribution = [5, 4, 3, 2, 1].map((rating) => {
     const count = reviews.filter((review) => review.rating === rating).length;
@@ -401,6 +406,9 @@ function ProductDetail() {
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [vouchers, setVouchers] = useState([]);
   const [copiedCode, setCopiedCode] = useState("");
+  const [bidAmount, setBidAmount] = useState("");
+  const [bidding, setBidding] = useState(false);
+  const [bidError, setBidError] = useState("");
 
   useEffect(() => {
     fetchListing();
@@ -467,6 +475,17 @@ function ProductDetail() {
   const isOwnListing = String(user?._id || "") === String(sellerId || "");
   const isUnavailable =
     listing.status !== "active" || Number(listing.totalQuantity) <= 0;
+  const isAuction = listing.pricing?.format === "auction";
+  const currentBid = Number(listing.pricing?.currentBid || listing.pricing?.startingBid || 0);
+  const placeBid = async () => {
+    if (!user) return navigate("/login");
+    setBidError(""); setBidding(true);
+    try {
+      await api.post(`/listings/${listing._id}/bids`, { amount: Number(bidAmount) });
+      setBidAmount(""); await fetchListing();
+    } catch (error) { setBidError(error.response?.data?.message || "Unable to place your bid."); }
+    finally { setBidding(false); }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -573,9 +592,8 @@ function ProductDetail() {
 
             {/* Price */}
             <div className="py-2">
-              <p className="text-3xl font-bold text-gray-900">
-                {formatPrice(listing.pricing.fixedPrice)}
-              </p>
+              <p className="text-3xl font-bold text-gray-900">{formatPrice(isAuction ? currentBid : listing.pricing.fixedPrice)}</p>
+              {isAuction && <p className="mt-1 text-sm text-gray-600">Current bid · {listing.pricing?.bidCount || 0} bid{listing.pricing?.bidCount === 1 ? "" : "s"}{listing.pricing?.auctionEndsAt ? ` · Ends ${new Date(listing.pricing.auctionEndsAt).toLocaleString("vi-VN")}` : ""}</p>}
             </div>
 
             {/* Available Vouchers / Coupons */}
@@ -611,19 +629,7 @@ function ProductDetail() {
               </div>
             )}
 
-            {/* Shipping */}
-            <div className="bg-gray-50 rounded-xl p-3 text-sm">
-              <div className="flex justify-between mb-1">
-                <span className="text-gray-600 font-semibold">Shipping:</span>
-                <span className="text-green-600 font-semibold">
-                  Free shipping
-                </span>
-              </div>
-              <div className="flex justify-between text-xs text-gray-400">
-                <span>Returns:</span>
-                <span>30 days returns</span>
-              </div>
-            </div>
+            <div className="rounded-xl border border-gray-200 p-4 text-sm"><div className="flex justify-between gap-4"><span className="font-semibold">Shipping</span><span className={Number(listing.shippingCost) === 0 || listing.shippingCostType === "free" ? "font-semibold text-green-700" : "font-semibold"}>{listing.shippingMethod === "Local pickup" ? "Local pickup" : Number(listing.shippingCost) === 0 || listing.shippingCostType === "free" ? "Free shipping" : formatPrice(listing.shippingCost)}</span></div>{listing.shippingMethod !== "Local pickup" && <p className="mt-1 text-gray-600">{listing.shippingMethod || "Standard shipping"} · Handles in {listing.handlingTime || "1 business day"}{listing.shippingFrom ? ` · Ships from ${listing.shippingFrom}` : ""}</p>}<div className="mt-3 border-t pt-3"><span className="font-semibold">Returns</span><p className="mt-1 text-gray-600">{listing.returnPolicy?.acceptsReturns ? `${listing.returnPolicy.window} returns · ${listing.returnPolicy.shippingPaidBy} pays return shipping` : "Seller does not accept returns"}</p></div></div>
 
             {/* Quantity */}
             <div className="flex items-center gap-3">
@@ -662,6 +668,8 @@ function ProductDetail() {
                 <div className="w-full bg-red-50 text-red-600 py-3 rounded-full font-semibold text-sm text-center">
                   This item is currently unavailable
                 </div>
+              ) : isAuction ? (
+                <div className="space-y-3"><label className="block text-sm font-semibold text-gray-700">Place a bid</label><div className="flex gap-2"><input type="number" min={currentBid + 1} value={bidAmount} onChange={(event) => setBidAmount(event.target.value)} placeholder={`More than ${formatPrice(currentBid)}`} className="min-w-0 flex-1 rounded-full border border-gray-400 px-4 py-3 outline-none focus:border-blue-600"/><button onClick={placeBid} disabled={bidding || isOwnListing} className="rounded-full bg-blue-600 px-6 py-3 font-semibold text-white disabled:opacity-50">{bidding ? "Placing..." : "Place bid"}</button></div>{bidError && <p className="text-sm text-red-600">{bidError}</p>}{listing.pricing?.buyItNowPrice && <button onClick={() => navigate(`/checkout/${listing._id}`)} className="w-full rounded-full border border-blue-600 py-3 font-semibold text-blue-600">Buy It Now · {formatPrice(listing.pricing.buyItNowPrice)}</button>}</div>
               ) : (
                 <>
                   <button
@@ -688,6 +696,17 @@ function ProductDetail() {
             {listing.description || "No description provided."}
           </p>
         </div>
+
+        <section className="mb-6 rounded-xl bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-bold text-gray-800">Item specifics</h2>
+          <div className="mt-5 grid divide-y divide-gray-100 sm:grid-cols-2 sm:divide-x sm:divide-y-0">
+            <div className="space-y-4 pr-0 sm:pr-6">{Object.entries(listing.itemSpecifics || {}).filter(([, value]) => value).slice(0, Math.ceil(Object.entries(listing.itemSpecifics || {}).filter(([, value]) => value).length / 2)).map(([key, value]) => <div key={key}><p className="text-xs text-gray-500">{specificLabel(key)}</p><p className="mt-1 text-sm font-medium text-gray-900">{value}</p></div>)}</div>
+            <div className="mt-4 space-y-4 pl-0 sm:mt-0 sm:pl-6">{Object.entries(listing.itemSpecifics || {}).filter(([, value]) => value).slice(Math.ceil(Object.entries(listing.itemSpecifics || {}).filter(([, value]) => value).length / 2)).map(([key, value]) => <div key={key}><p className="text-xs text-gray-500">{specificLabel(key)}</p><p className="mt-1 text-sm font-medium text-gray-900">{value}</p></div>)}</div>
+          </div>
+          {!Object.values(listing.itemSpecifics || {}).some(Boolean) && <p className="mt-4 text-sm text-gray-500">The seller has not added item specifics.</p>}
+        </section>
+
+        <section className="mb-6 rounded-xl bg-white p-6 shadow-sm"><h2 className="text-lg font-bold text-gray-800">Shipping and returns</h2><div className="mt-5 grid gap-6 md:grid-cols-3"><div><p className="text-xs text-gray-500">Service</p><p className="mt-1 text-sm font-semibold">{listing.shippingMethod || "Standard shipping"}</p></div><div><p className="text-xs text-gray-500">Item location</p><p className="mt-1 text-sm font-semibold">{listing.shippingFrom || "Not specified"}</p><p className="mt-1 text-xs text-gray-500">Country of origin: {listing.itemOrigin || "Not specified"}</p></div><div><p className="text-xs text-gray-500">Package</p><p className="mt-1 text-sm font-semibold">{listing.packageLength ? `${listing.packageLength} × ${listing.packageWidth} × ${listing.packageHeight} in` : "Dimensions not specified"}</p><p className="mt-1 text-xs text-gray-500">{listing.packageWeightLbs ? `${listing.packageWeightLbs} lbs ${listing.packageWeightOz || 0} oz` : "Weight not specified"}</p></div></div></section>
 
         <div className="bg-white rounded-xl p-6 shadow-sm mb-6 border border-gray-100">
           <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">

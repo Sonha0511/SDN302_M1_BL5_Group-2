@@ -80,27 +80,81 @@ exports.updateSellerProfile = async (req, res) => {
         .json({ success: false, message: "Seller not found" });
     }
 
-    const values = { name, username, storeName, bio, phone, location, shippingFrom };
-    const limits = { name: 60, username: 30, storeName: 60, bio: 500, phone: 20, location: 80, shippingFrom: 80 };
-    const normalized = Object.fromEntries(Object.entries(values).map(([key, value]) => [key, typeof value === "string" ? value.trim() : ""]));
-    const invalidLength = Object.entries(limits).find(([key, limit]) => normalized[key].length > limit);
+    const values = {
+      name,
+      username,
+      storeName,
+      bio,
+      phone,
+      location,
+      shippingFrom,
+    };
+    const limits = {
+      name: 60,
+      username: 30,
+      storeName: 60,
+      bio: 500,
+      phone: 20,
+      location: 80,
+      shippingFrom: 80,
+    };
+    const normalized = Object.fromEntries(
+      Object.entries(values).map(([key, value]) => [
+        key,
+        typeof value === "string" ? value.trim() : "",
+      ]),
+    );
+    const invalidLength = Object.entries(limits).find(
+      ([key, limit]) => normalized[key].length > limit,
+    );
     if (invalidLength) {
-      return res.status(400).json({ success: false, message: `${invalidLength[0]} must be ${invalidLength[1]} characters or fewer` });
+      return res.status(400).json({
+        success: false,
+        message: `${invalidLength[0]} must be ${invalidLength[1]} characters or fewer`,
+      });
     }
     if (!normalized.name || !normalized.storeName) {
-      return res.status(400).json({ success: false, message: "Name and store name are required" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Name and store name are required" });
     }
     if (!/^[a-zA-Z0-9._-]{3,30}$/.test(normalized.username)) {
-      return res.status(400).json({ success: false, message: "Username must be 3-30 letters, numbers, dots, underscores or hyphens" });
+      return res.status(400).json({
+        success: false,
+        message:
+          "Username must be 3-30 letters, numbers, dots, underscores or hyphens",
+      });
     }
     if (normalized.phone && !/^\+?[0-9 ()-]{8,20}$/.test(normalized.phone)) {
-      return res.status(400).json({ success: false, message: "Please provide a valid phone number" });
+      return res.status(400).json({
+        success: false,
+        message: "Please provide a valid phone number",
+      });
     }
-    const allowedBusinessTypes = ["Individual", "Business", "Authorized reseller"];
-    const allowedResponseTimes = ["Within 24 hours", "Within 2 business days", "Within 3 business days"];
-    const allowedReturnPolicies = ["30-day returns", "14-day returns", "No returns"];
-    if (!allowedBusinessTypes.includes(businessType) || !allowedResponseTimes.includes(responseTime) || !allowedReturnPolicies.includes(returnPolicy)) {
-      return res.status(400).json({ success: false, message: "Please choose valid store policy options" });
+    const allowedBusinessTypes = [
+      "Individual",
+      "Business",
+      "Authorized reseller",
+    ];
+    const allowedResponseTimes = [
+      "Within 24 hours",
+      "Within 2 business days",
+      "Within 3 business days",
+    ];
+    const allowedReturnPolicies = [
+      "30-day returns",
+      "14-day returns",
+      "No returns",
+    ];
+    if (
+      !allowedBusinessTypes.includes(businessType) ||
+      !allowedResponseTimes.includes(responseTime) ||
+      !allowedReturnPolicies.includes(returnPolicy)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Please choose valid store policy options",
+      });
     }
 
     const nextUsername = normalized.username;
@@ -161,12 +215,10 @@ exports.getSellerListings = async (req, res) => {
     const userId = req.user?.id || req.user?._id || req.userId;
 
     if (!userId) {
-      return res
-        .status(401)
-        .json({
-          success: false,
-          message: "Seller information not found. Please log in again!",
-        });
+      return res.status(401).json({
+        success: false,
+        message: "Seller information not found. Please log in again!",
+      });
     }
 
     const listings = await Listing.find({ sellerId: userId });
@@ -185,7 +237,8 @@ exports.createListing = async (req, res) => {
     if (req.userRole !== "seller") {
       return res.status(403).json({
         success: false,
-        message: "Only registered and verified sellers are authorized to list products. Please complete seller registration.",
+        message:
+          "Only registered and verified sellers are authorized to list products. Please complete seller registration.",
       });
     }
 
@@ -196,6 +249,37 @@ exports.createListing = async (req, res) => {
       condition,
       fixedPrice,
       totalQuantity,
+      category,
+      brand,
+      model,
+      size,
+      color,
+      department,
+      storageCapacity,
+      network,
+      ram,
+      screenSize,
+      shipping,
+      shippingCost,
+      handlingTime,
+      shippingFrom,
+      itemOrigin,
+      shippingCostType,
+      packageWeightLbs,
+      packageWeightOz,
+      packageLength,
+      packageWidth,
+      packageHeight,
+      acceptsReturns,
+      returnWindow,
+      returnShippingPaidBy,
+      pricingFormat,
+      auctionDuration,
+      startingBid,
+      buyItNowPrice,
+      reservePrice,
+      immediatePayment,
+      scheduled,
     } = req.body;
     const userId = req.user?.id || req.user?._id || req.userId;
 
@@ -208,6 +292,91 @@ exports.createListing = async (req, res) => {
 
     const parsedPrice = parseFloat(fixedPrice) || 0;
     const parsedQuantity = parseInt(totalQuantity, 10) || 1;
+    const allowedConditions = ["new", "like_new", "good", "acceptable"];
+    const allowedFormats = ["auction", "fixed"];
+    const allowedShipping = [
+      "Standard shipping",
+      "Express shipping",
+      "Freight",
+      "Local pickup",
+    ];
+    const allowedReturnWindows = ["30 days", "14 days", "No returns"];
+    const auctionDays = { "1 day": 1, "3 days": 3, "5 days": 5, "7 days": 7, "10 days": 10 };
+    const numericPrice = Number(fixedPrice);
+    const numericQuantity = Number(totalQuantity);
+
+    if (
+      typeof title !== "string" ||
+      title.trim().length < 5 ||
+      title.trim().length > 80
+    ) {
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: "Title must be between 5 and 80 characters.",
+        });
+    }
+    if (typeof description !== "string" || description.trim().length < 10) {
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: "Description must be at least 10 characters.",
+        });
+    }
+    if (!imageUrls.length) {
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: "At least one product image is required.",
+        });
+    }
+    if (
+      !Number.isFinite(numericPrice) ||
+      numericPrice <= 0 ||
+      !Number.isInteger(numericQuantity) ||
+      numericQuantity < 1
+    ) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Enter a valid price and quantity." });
+    }
+    if (
+      !allowedConditions.includes(condition) ||
+      !allowedFormats.includes(pricingFormat) ||
+      !allowedShipping.includes(shipping)
+    ) {
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: "Please choose valid listing options.",
+        });
+    }
+    if (
+      pricingFormat === "auction" &&
+      (!Number.isFinite(Number(startingBid)) ||
+        Number(startingBid) <= 0 ||
+        (buyItNowPrice && Number(buyItNowPrice) <= Number(startingBid)))
+    ) {
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message:
+            "Auction requires a valid starting bid, and Buy It Now must be higher.",
+        });
+    }
+    if (!allowedReturnWindows.includes(returnWindow)) {
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: "Please choose a valid return policy.",
+        });
+    }
 
     const newListing = new Listing({
       sellerId: userId,
@@ -219,8 +388,45 @@ exports.createListing = async (req, res) => {
       pricing: {
         currency: "VND",
         fixedPrice: parsedPrice,
+        format: pricingFormat || "fixed",
+        startingBid: parseFloat(startingBid) || undefined,
+        buyItNowPrice: parseFloat(buyItNowPrice) || undefined,
+        reservePrice: parseFloat(reservePrice) || undefined,
+        auctionDuration: auctionDuration || undefined,
+        immediatePayment: immediatePayment === "true",
+        currentBid: pricingFormat === "auction" ? Number(startingBid) : 0,
+        auctionEndsAt: pricingFormat === "auction" ? new Date(Date.now() + (auctionDays[auctionDuration] || 7) * 86400000) : undefined,
+      },
+      category: category || "Other",
+      itemSpecifics: {
+        brand: brand || "",
+        model: model || "",
+        size: size || "",
+        color: color || "",
+        department: department || "",
+        storageCapacity: storageCapacity || "",
+        network: network || "",
+        ram: ram || "",
+        screenSize: screenSize || "",
       },
       totalQuantity: parsedQuantity,
+      shippingMethod: shipping || "Standard shipping",
+      shippingCost: Number(shippingCost) || 0,
+      handlingTime: handlingTime || "1 business day",
+      shippingFrom: shippingFrom || "",
+      itemOrigin: itemOrigin || "Vietnam",
+      shippingCostType: shippingCostType || "flat",
+      packageWeightLbs: Number(packageWeightLbs) || undefined,
+      packageWeightOz: Number(packageWeightOz) || undefined,
+      packageLength: Number(packageLength) || undefined,
+      packageWidth: Number(packageWidth) || undefined,
+      packageHeight: Number(packageHeight) || undefined,
+      scheduled: scheduled === "true",
+      returnPolicy: {
+        acceptsReturns: acceptsReturns === "true",
+        window: returnWindow || "No returns",
+        shippingPaidBy: returnShippingPaidBy || "Buyer",
+      },
       status: "active",
     });
 
@@ -231,12 +437,10 @@ exports.createListing = async (req, res) => {
       "🔥 Detailed error in createListing:",
       JSON.stringify(error, null, 2),
     );
-    return res
-      .status(400)
-      .json({
-        success: false,
-        message: "Unable to publish listing: " + error.message,
-      });
+    return res.status(400).json({
+      success: false,
+      message: "Unable to publish listing: " + error.message,
+    });
   }
 };
 
@@ -256,23 +460,19 @@ exports.updateListing = async (req, res) => {
     const userId = req.user?.id || req.user?._id || req.userId;
 
     if (!userId) {
-      return res
-        .status(401)
-        .json({
-          success: false,
-          message: "Session expired. Please log in again!",
-        });
+      return res.status(401).json({
+        success: false,
+        message: "Session expired. Please log in again!",
+      });
     }
 
     const listing = await Listing.findOne({ _id: id, sellerId: userId });
     if (!listing) {
-      return res
-        .status(404)
-        .json({
-          success: false,
-          message:
-            "Product not found or you do not have permission to edit this item!",
-        });
+      return res.status(404).json({
+        success: false,
+        message:
+          "Product not found or you do not have permission to edit this item!",
+      });
     }
 
     if (req.files && req.files.length > 0) {
@@ -365,25 +565,21 @@ exports.updateOrderStatus = async (req, res) => {
     }
 
     if (!order.sellerConfirmed) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "Seller must confirm the order first!",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "Seller must confirm the order first!",
+      });
     }
     if (
       ["delivered", "delivery_failed", "cancelled", "returned"].includes(
         order.status,
       )
     ) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message:
-            "This order is complete and cannot move back to another status.",
-        });
+      return res.status(400).json({
+        success: false,
+        message:
+          "This order is complete and cannot move back to another status.",
+      });
     }
     const allowedTransitions = {
       pending: ["awaiting_payment", "awaiting_shipment", "cancelled"],
@@ -426,12 +622,10 @@ exports.confirmOrder = async (req, res) => {
         order.status,
       )
     ) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "A completed order cannot be confirmed.",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "A completed order cannot be confirmed.",
+      });
     }
 
     order.sellerConfirmed = true;

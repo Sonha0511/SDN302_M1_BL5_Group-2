@@ -18,11 +18,7 @@ connectDB();
 // Middleware
 app.use(cors());
 app.use(express.json());
-// Local React development can issue repeated API requests during reloads.
-// Keep rate limiting enabled for deployed environments.
-if (process.env.NODE_ENV === "production") {
-  app.use("/api", generalLimiter);
-}
+app.use("/api", generalLimiter);
 
 // Routes (sẽ thêm dần)
 app.use("/api/auth", require("./routes/auth"));

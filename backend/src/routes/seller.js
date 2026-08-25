@@ -3,12 +3,14 @@ const router = express.Router();
 const sellerController = require("../controllers/sellerController.js");
 const { upload } = require("../config/cloudinary.js");
 const authMiddleware = require("../middleware/auth.js");
+const { createLimiter } = require("../middleware/rateLimiter.js");
 
 router.get("/:id/profile", sellerController.getSellerProfile);
 
 router.use(authMiddleware);
 router.patch(
   "/profile",
+  createLimiter,
   (req, res, next) => {
     upload.single("avatar")(req, res, (err) => {
       if (err) {
@@ -29,6 +31,7 @@ router.get("/listings", sellerController.getSellerListings);
 // 2. API Đăng sản phẩm - ĐÃ BỌC HÀM XỬ LÝ LỖI MULTER / CLOUDINARY TRỰC TIẾP
 router.post(
   "/listings",
+  createLimiter,
   (req, res, next) => {
     upload.array("images", 5)(req, res, (err) => {
       if (err) {
@@ -55,16 +58,29 @@ router.post(
 // 3. API Cập nhật sản phẩm
 router.put(
   "/listings/:id",
+  createLimiter,
   upload.array("images", 5),
   sellerController.updateListing,
 );
 
 // 4. API Xóa sản phẩm
-router.delete("/listings/:id", sellerController.deleteListing);
+router.delete("/listings/:id", createLimiter, sellerController.deleteListing);
 
 // 5. Các API Đơn hàng
 router.get("/orders", sellerController.getSellerOrders);
-router.patch("/orders/:id/status", sellerController.updateOrderStatus);
-router.patch("/orders/:id/confirm", sellerController.confirmOrder);
-router.patch("/listings/:id/toggle", sellerController.toggleListingStatus);
+router.patch(
+  "/orders/:id/status",
+  createLimiter,
+  sellerController.updateOrderStatus,
+);
+router.patch(
+  "/orders/:id/confirm",
+  createLimiter,
+  sellerController.confirmOrder,
+);
+router.patch(
+  "/listings/:id/toggle",
+  createLimiter,
+  sellerController.toggleListingStatus,
+);
 module.exports = router;

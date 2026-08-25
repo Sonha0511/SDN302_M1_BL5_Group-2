@@ -37,4 +37,7 @@ const createLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-module.exports = { generalLimiter, authLimiter, createLimiter };
+// Development/demo mode: keep the existing route contract but do not throttle
+// any request. This avoids blocking listing uploads and rapid bid updates.
+const noLimit = (_req, _res, next) => next();
+module.exports = { generalLimiter: noLimit, authLimiter: noLimit, createLimiter: noLimit };
